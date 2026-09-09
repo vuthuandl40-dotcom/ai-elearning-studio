@@ -1,0 +1,66 @@
+name: Release CI
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: elearning
+          POSTGRES_USER: elearning
+          POSTGRES_PASSWORD: elearning
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U elearning -d elearning"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://elearning:elearning@localhost:5432/elearning
+      APP_ENV: test
+      JWT_SECRET_KEY: ci-secret-ci-secret-ci-secret-ci-secret
+      CORS_ORIGINS: http://localhost:3000
+      RATE_LIMIT_ENABLED: "false"
+      NEXT_PUBLIC_API_URL: https://api-production-f81b.up.railway.app
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reconstruct source tree
+        run: |
+          mkdir src
+          cat deploy-source/source.b64.* | base64 -d > source.tar.xz
+          tar -xJf source.tar.xz -C src
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend dependencies
+        working-directory: src
+        run: pip install -r requirements.txt
+      - name: Migrate database
+        working-directory: src
+        run: alembic upgrade head
+      - name: Backend tests
+        working-directory: src
+        run: pytest -q
+      - name: Release checker
+        working-directory: src
+        run: python scripts/release_check.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install frontend dependencies
+        working-directory: src/frontend
+        run: npm install
+      - name: Build frontend
+        working-directory: src/frontend
+        run: npm run build
+      - name: Docker build API
+        run: docker build -f Dockerfile.api -t ai-elearning-api:ci .
+      - name: Docker build frontend
+        run: docker build -f Dockerfile.frontend -t ai-elearning-frontend:ci .
