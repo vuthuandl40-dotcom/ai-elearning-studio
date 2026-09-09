@@ -68,3 +68,33 @@ jobs:
         run: docker build -f Dockerfile.api -t ai-elearning-api:ci .
       - name: Docker build frontend
         run: docker build --build-arg NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL" -f Dockerfile.frontend -t ai-elearning-frontend:ci .
+      - name: Runtime smoke API container
+        run: |
+          docker run -d --name api-smoke --network host \
+            -e PORT=8000 \
+            -e APP_ENV=test \
+            -e DATABASE_URL="$DATABASE_URL" \
+            -e JWT_SECRET_KEY="$JWT_SECRET_KEY" \
+            -e CORS_ORIGINS="$CORS_ORIGINS" \
+            -e RATE_LIMIT_ENABLED=false \
+            ai-elearning-api:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/health >/tmp/health.json; then break; fi
+            sleep 2
+          done
+          cat /tmp/health.json
+          curl -fsS http://127.0.0.1:8000/ready
+      - name: Runtime smoke frontend container
+        run: |
+          docker run -d --name frontend-smoke --network host -e PORT=3000 ai-elearning-frontend:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/login >/tmp/login.html; then break; fi
+            sleep 2
+          done
+          test -s /tmp/login.html
+          grep -q "AI E-Learning" /tmp/login.html
+      - name: Runtime logs on failure
+        if: failure()
+        run: |
+          docker logs api-smoke 2>&1 || true
+          docker logs frontend-smoke 2>&1 || true
