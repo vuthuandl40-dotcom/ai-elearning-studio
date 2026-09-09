@@ -1,0 +1,10 @@
+FROM python:3.12-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends unzip coreutils libreoffice-impress libreoffice-core fonts-dejavu-core curl ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY deploy-source/ /tmp/deploy-source/
+RUN cat /tmp/deploy-source/source.b64.* | base64 -d > /tmp/source.zip && unzip -q /tmp/source.zip -d /app && rm -rf /tmp/deploy-source /tmp/source.zip
+RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN mkdir -p storage/uploads storage/media storage/exports
+EXPOSE 8000
+CMD ["sh", "-c", "alembic upgrade head && (python -m app.scripts.worker &) && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
