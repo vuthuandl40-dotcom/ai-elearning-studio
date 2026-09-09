@@ -31,17 +31,18 @@ jobs:
       NEXT_PUBLIC_API_URL: https://api-production-f81b.up.railway.app
     steps:
       - uses: actions/checkout@v4
-      - name: Reconstruct source tree
+      - name: Extract runtime source
         run: |
           mkdir src
-          cat deploy-source/source.b64.* | base64 -d > source.tar.xz
-          tar -xJf source.tar.xz -C src
+          tar -xJf runtime-source.tar.xz -C src
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Install backend dependencies
         working-directory: src
         run: pip install -r requirements.txt
+      - name: Enable pgvector extension
+        run: PGPASSWORD=elearning psql -h localhost -U elearning -d elearning -c 'CREATE EXTENSION IF NOT EXISTS vector;'
       - name: Migrate database
         working-directory: src
         run: alembic upgrade head
