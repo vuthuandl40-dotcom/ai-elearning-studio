@@ -38,6 +38,7 @@ jobs:
           echo "6d12efd05141a0f954ac1be2bcb644dcaee9771d0973757fde99d9ca0f80461a  source.tar.xz" | sha256sum -c -
           mkdir src
           tar -xJf source.tar.xz -C src
+          sed -i '/const updateProjectTheme = async (themeKey: string) => {/a\    if (!project) return;' src/frontend/components/editor/LessonEditor.tsx
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
