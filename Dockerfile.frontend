@@ -1,0 +1,17 @@
+FROM node:20-bookworm-slim AS builder
+WORKDIR /work
+RUN apt-get update && apt-get install -y --no-install-recommends unzip coreutils ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY deploy-source/ /tmp/deploy-source/
+RUN cat /tmp/deploy-source/source.b64.* | base64 -d > /tmp/source.zip && unzip -q /tmp/source.zip -d /work/src && rm -rf /tmp/deploy-source /tmp/source.zip
+WORKDIR /work/src/frontend
+RUN npm install
+RUN npm run build
+
+FROM node:20-bookworm-slim AS runner
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=builder /work/src/frontend/.next/standalone ./
+COPY --from=builder /work/src/frontend/.next/static ./.next/static
+COPY --from=builder /work/src/frontend/public ./public
+EXPOSE 3000
+CMD ["sh", "-c", "HOSTNAME=0.0.0.0 PORT=${PORT:-3000} node server.js"]
