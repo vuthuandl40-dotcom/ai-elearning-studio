@@ -1,0 +1,10 @@
+--- a/frontend/components/editor/LessonEditor.tsx
++++ b/frontend/components/editor/LessonEditor.tsx
+@@ -177,6 +177,7 @@
+   const refreshMedia = async () => { setMediaAssets(await api.listMedia(projectId)); };
+ 
+   const updateProjectTheme = async (themeKey: string) => {
++    if (!project) return;
+     const settings = { ...(project.settings || {}), theme_key: themeKey };
+     const saved = await api.updateProject(project.id, { settings });
+     setProject((prev) => prev ? ({ ...prev, ...saved }) : saved);
