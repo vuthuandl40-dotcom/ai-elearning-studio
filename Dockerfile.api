@@ -6,6 +6,7 @@ COPY deploy-source/ /tmp/deploy-source/
 RUN cat /tmp/deploy-source/source.b64.* | base64 -d > /tmp/source.tar.xz \
     && echo "6d12efd05141a0f954ac1be2bcb644dcaee9771d0973757fde99d9ca0f80461a  /tmp/source.tar.xz" | sha256sum -c - \
     && tar -xJf /tmp/source.tar.xz -C /app \
+    && patch -d /app -p1 < /tmp/deploy-source/patches/0005-section-regeneration-instruction.patch \
     && rm -rf /tmp/deploy-source /tmp/source.tar.xz
 RUN mkdir -p /app/app/scripts \
     && touch /app/app/scripts/__init__.py \
