@@ -1,0 +1,43 @@
+--- a/app/main.py
++++ b/app/main.py
+@@ -1,3 +1,7 @@
++from contextlib import asynccontextmanager
++import logging
++import threading
++
+ from fastapi import Depends, FastAPI, Header, HTTPException
+ from fastapi.middleware.cors import CORSMiddleware
+ from fastapi.responses import PlainTextResponse
+@@ -6,14 +10,32 @@
+ from app.core.config import get_settings, validate_production_settings
+ from app.core.middleware import AuditMiddleware, CsrfOriginMiddleware, MetricsMiddleware, RateLimitMiddleware, RequestContextMiddleware
+ from app.db.session import get_db
++from app.scripts.worker import run as run_job_worker
+ from sqlalchemy import text
+ from sqlalchemy.orm import Session
+ 
+ settings = get_settings()
+ validate_production_settings(settings)
++log = logging.getLogger("elearning.main")
++
++
++@asynccontextmanager
++async def lifespan(_: FastAPI):
++    worker = threading.Thread(
++        target=run_job_worker,
++        kwargs={"once": False},
++        name="elearning-job-worker",
++        daemon=True,
++    )
++    worker.start()
++    log.info("embedded_job_worker_started thread=%s", worker.name)
++    yield
++
++
+ app = FastAPI(
+     title=settings.app_name,
+     version="1.0.0",
++    lifespan=lifespan,
+     description=(
+         "Release candidate through Step 13: multi-tenant organizations, tenant/ownership isolation across the authoring API, "
+         "rotating refresh sessions, password reset/email verification, audit/rate-limit/security middleware, "
