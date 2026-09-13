@@ -1,0 +1,260 @@
+--- a/app/schemas/generation.py
++++ b/app/schemas/generation.py
+@@ -2,7 +2,7 @@
+ from typing import Any
+ from uuid import UUID
+ 
+-from pydantic import BaseModel, ConfigDict
++from pydantic import BaseModel, ConfigDict, Field
+ 
+ 
+ class GenerateLessonRequest(BaseModel):
+@@ -15,6 +15,7 @@
+     use_ai: bool = True
+     force: bool = False
+     fallback_to_local: bool = True
++    instruction: str | None = Field(default=None, max_length=6000)
+ 
+ 
+ class GenerationRunRead(BaseModel):
+--- a/app/api/routes/generation.py
++++ b/app/api/routes/generation.py
+@@ -62,6 +62,7 @@
+             use_ai=payload.use_ai,
+             force=payload.force,
+             fallback_to_local=payload.fallback_to_local,
++            instruction=payload.instruction,
+         )
+     except GenerationError as exc:
+         raise HTTPException(status_code=409, detail=str(exc)) from exc
+--- a/app/services/lesson_writer/service.py
++++ b/app/services/lesson_writer/service.py
+@@ -1,6 +1,7 @@
+ from __future__ import annotations
+ 
+ from datetime import datetime, timezone
++import re
+ from decimal import Decimal
+ from uuid import UUID
+ 
+@@ -129,6 +130,150 @@
+     return [chunks_by_id[x] for x in section_plan.get("source_chunk_ids", []) if x in chunks_by_id]
+ 
+ 
++_TOKEN_RE = re.compile(r"\d+(?:[.,]\d+)?|[^\W\d_]+", re.UNICODE)
++_STOPWORDS = {
++    "và", "của", "có", "là", "cho", "với", "các", "một", "những", "được", "về", "trong", "theo",
++    "phần", "này", "slide", "nội", "dung", "bài", "học", "sinh", "giáo", "viên", "địa", "lí", "lý",
++    "tạo", "lại", "toàn", "bộ", "ngắn", "gọn", "làm", "rõ", "dễ", "hiểu", "không", "nguồn",
++}
++
++
++def _tokens(text: str) -> set[str]:
++    return {x.lower() for x in _TOKEN_RE.findall(text or "") if len(x) > 1 and x.lower() not in _STOPWORDS}
++
++
++def _chunk_score(chunk: SourceChunk, query: str) -> int:
++    q = _tokens(query)
++    if not q:
++        return 0
++    heading_tokens = _tokens(chunk.heading or "")
++    content_tokens = _tokens(chunk.content or "")
++    overlap = q & content_tokens
++    heading_overlap = q & heading_tokens
++    numeric = {x for x in q if any(ch.isdigit() for ch in x)}
++    numeric_overlap = numeric & content_tokens
++    return len(overlap) + 2 * len(heading_overlap) + 4 * len(numeric_overlap)
++
++
++def _rank_chunks(chunks: list[SourceChunk], query: str, limit: int = 4) -> list[SourceChunk]:
++    ranked = sorted(((_chunk_score(chunk, query), chunk) for chunk in chunks), key=lambda item: item[0], reverse=True)
++    positive = [chunk for score, chunk in ranked if score >= 2]
++    return positive[:limit]
++
++
++def _first_source_sentence(text: str, limit: int = 170) -> str:
++    compact = " ".join((text or "").split())
++    if not compact:
++        return ""
++    sentence = re.split(r"(?<=[.!?…])\s+", compact, maxsplit=1)[0]
++    if len(sentence) <= limit:
++        return sentence
++    cut = sentence[: limit - 1].rsplit(" ", 1)[0].rstrip(" ,;:")
++    return cut + "…"
++
++
++def _looks_administrative(text: str) -> bool:
++    value = (text or "").strip().lower()
++    bad = (
++        "chương ", "tên bài dạy", "môn học:", "thiết bị dạy học", "tiến trình dạy học",
++        "bảng tiêu chí", "rubric", "phát triển năng lực số", "mục tiêu", "i. mục tiêu", "ii. thiết bị",
++    )
++    return any(value.startswith(x) for x in bad)
++
++
++def _instruction_specs(instruction: str) -> list[dict[str, object]]:
++    lines = [line.strip() for line in (instruction or "").splitlines() if line.strip()]
++    specs: list[dict[str, object]] = []
++    current: dict[str, object] | None = None
++    for line in lines:
++        match = re.match(r"(?i)^slide\s+(\d+)\b(.*)$", line)
++        if match:
++            rest = match.group(2).strip(" :-")
++            quoted = re.search(r"[“\"]([^”\"]+)[”\"]", rest)
++            if quoted:
++                title = quoted.group(1).strip()
++            else:
++                title = re.split(r"\.|Nội dung|Làm rõ", rest, maxsplit=1, flags=re.I)[0].strip(" :.-")
++            current = {"order": int(match.group(1)), "title": title or f"Slide {match.group(1)}", "bullets": []}
++            specs.append(current)
++            continue
++        if current is not None and re.match(r"^[-•+]\s+", line):
++            bullet = re.sub(r"^[-•+]\s+", "", line).strip()
++            if bullet:
++                current["bullets"].append(bullet)
++    return sorted(specs, key=lambda row: int(row["order"]))
++
++
++def _instruction_local_section(
++    project: Project,
++    section_plan: dict,
++    chunks: list[SourceChunk],
++    instruction: str,
++) -> tuple[SectionDraft | None, list[str]]:
++    specs = _instruction_specs(instruction)
++    if not specs:
++        return None, []
++    if section_plan.get("section_key") in {"interaction_1", "interaction_2", "interaction_3", "practice"}:
++        return None, []
++
++    warnings: list[str] = []
++    total_duration = int(section_plan.get("planned_duration_seconds") or 0)
++    count = len(specs)
++    base, remainder = divmod(max(0, total_duration), max(1, count))
++    durations = [base + (1 if i < remainder else 0) for i in range(count)]
++    slides: list[SlideBlueprint] = []
++
++    for idx, spec in enumerate(specs):
++        title = str(spec["title"])
++        requested = [str(x) for x in spec.get("bullets", [])]
++        query = " ".join([title, *requested])
++        matched = _rank_chunks(chunks, query, 5)
++        if project.source_policy == "strict" and not matched:
++            raise GenerationError(f"Không tìm thấy đoạn nguồn phù hợp để tạo lại slide ‘{title}’ theo chế độ Source: strict.")
++
++        source_bullets: list[str] = []
++        refs: list[ClaimRef] = []
++        for chunk in matched:
++            sentence = _first_source_sentence(chunk.content)
++            if not sentence or _looks_administrative(sentence) or sentence in source_bullets:
++                continue
++            source_bullets.append(sentence)
++            refs.append(ClaimRef(source_chunk_id=str(chunk.id), claim_text=sentence))
++            if len(source_bullets) >= 4:
++                break
++
++        if not source_bullets:
++            if project.source_policy == "strict":
++                raise GenerationError(f"Nguồn phù hợp với ‘{title}’ chỉ chứa tiêu đề/hành chính; chưa đủ dữ liệu để tái sinh an toàn.")
++            source_bullets = requested[:4] or ["Nội dung được tạo theo yêu cầu của giáo viên."]
++            warnings.append(f"{title}: không có source chunk đủ rõ; dùng yêu cầu giáo viên làm nội dung local.")
++
++        visual_type = "map" if any(x in query.lower() for x in ("bản đồ", "vị trí", "phạm vi", "lãnh thổ")) else "educational_illustration"
++        facts = "; ".join(source_bullets[:3])
++        guiding = f"Từ học liệu, em rút ra nhận xét gì về {title.lower()}?"
++        script = f"Các em hãy quan sát học liệu về {title.lower()}. " + " ".join(source_bullets[:3]) + f" Sau đó, {guiding.lower()}"
++        slides.append(SlideBlueprint(
++            section_key=str(section_plan["section_key"]),
++            title=title,
++            slide_type="explore" if str(section_plan["section_key"]).startswith("explore_") else "content",
++            onscreen_text=source_bullets[:4],
++            teacher_script=script,
++            student_instruction="Quan sát học liệu, xác định thông tin chính và trao đổi câu trả lời.",
++            guiding_question=guiding,
++            visual_type=visual_type,
++            visual_description=f"{visual_type}: minh họa trực quan cho ‘{title}’, ưu tiên một ý chính, dễ quan sát ở cấp {project.grade or ''}.",
++            image_prompt=(f"Create a {project.visual_style or 'clean modern educational'} 16:9 educational visual for '{title}'. "
++                          f"Ground the visual only in these source-backed ideas: {facts}. No invented labels, statistics or watermark."),
++            video_prompt=(f"Create a short 16:9 educational scene for '{title}'. Use only these source-backed ideas: {facts}. "
++                          "Slow clear camera movement, no invented factual labels."),
++            duration_seconds=durations[idx],
++            layout_hint="visual-left/text-right",
++            source_refs=refs,
++            metadata={"local_instruction_regeneration": True, "teacher_instruction": instruction[:2000]},
++        ))
++    return SectionDraft(section_key=str(section_plan["section_key"]), slides=slides, warnings=warnings), warnings
++
++
+ def _build_section(
+     *,
+     project: Project,
+@@ -433,6 +578,7 @@
+     use_ai: bool = True,
+     force: bool = False,
+     fallback_to_local: bool = True,
++    instruction: str | None = None,
+ ) -> GenerationRun:
+     settings = get_settings()
+     project = db.get(Project, project_id)
+@@ -445,6 +591,8 @@
+     section_plan = next((x for x in plan.get("sections", []) if x.get("section_key") == section_key), None)
+     if not section_plan:
+         raise GenerationError("Section is not part of the approved plan")
++    instruction = (instruction or "").strip()
++    effective_section_plan = dict(section_plan)
+     section = db.scalar(select(LessonSection).where(LessonSection.project_id == project_id, LessonSection.section_key == section_key))
+     if not section:
+         raise GenerationError("Section not found")
+@@ -461,6 +609,28 @@
+     objectives = _objectives(db, project_id)
+     chunks = _chunks(db, project_id)
+     chunks_by_id = {str(x.id): x for x in chunks}
++
++    if instruction:
++        specs = _instruction_specs(instruction)
++        query = instruction + " " + " ".join(str(x.get("title") or "") for x in specs)
++        matched = _rank_chunks(chunks, query, max(8, len(specs) * 4 if specs else 8))
++        if project.source_policy == "strict" and not matched:
++            raise GenerationError("Không tìm thấy nguồn phù hợp với yêu cầu tạo lại section trong chế độ Source: strict.")
++        if matched:
++            effective_section_plan["source_chunk_ids"] = [str(x.id) for x in matched]
++        if specs:
++            effective_section_plan["slide_count_hint"] = len(specs)
++            effective_section_plan["topic_titles"] = [str(x["title"]) for x in specs]
++        effective_section_plan["teacher_regeneration_instruction"] = instruction
++
++        updated_sections = []
++        for row in plan.get("sections", []):
++            updated_sections.append(effective_section_plan if row.get("section_key") == section_key else row)
++        plan = {**plan, "sections": updated_sections}
++        plan_run.plan_json = plan
++        db.add(plan_run)
++        db.commit()
++
+     ai_enabled = bool(use_ai and settings.openai_api_key)
+     writer = OpenAILessonWriter() if ai_enabled else None
+     teacher_profile = _default_teacher_profile(db, project)
+@@ -479,13 +649,17 @@
+     db.refresh(run)
+ 
+     try:
+-        section_draft = _build_section(
+-            project=project, section_plan=section_plan, objectives=objectives,
+-            chunks_by_id=chunks_by_id, teacher_profile=teacher_profile,
+-            use_ai=ai_enabled, fallback_to_local=fallback_to_local, writer=writer,
+-        )
++        section_draft = None
++        if instruction and not ai_enabled:
++            section_draft, _ = _instruction_local_section(project, effective_section_plan, chunks, instruction)
++        if section_draft is None:
++            section_draft = _build_section(
++                project=project, section_plan=effective_section_plan, objectives=objectives,
++                chunks_by_id=chunks_by_id, teacher_profile=teacher_profile,
++                use_ai=ai_enabled, fallback_to_local=fallback_to_local, writer=writer,
++            )
+         section_draft = validate_and_repair_section(
+-            section_draft, plan_section=section_plan, valid_chunk_ids=set(chunks_by_id), source_policy=project.source_policy
++            section_draft, plan_section=effective_section_plan, valid_chunk_ids=set(chunks_by_id), source_policy=project.source_policy
+         )
+         db.execute(delete(Slide).where(Slide.section_id == section.id))
+         db.flush()
