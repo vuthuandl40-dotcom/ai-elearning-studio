@@ -1,0 +1,29 @@
+--- a/frontend/lib/api.ts
++++ b/frontend/lib/api.ts
+@@ -60,9 +60,10 @@
+     if (await refreshBrowserSession()) return request<T>(path, init, true);
+   }
+   if (!res.ok) {
+-    let detail: unknown;
+-    try { detail = await res.json(); } catch { detail = await res.text(); }
+-    const message = typeof detail === "object" && detail && "detail" in detail ? String((detail as { detail: unknown }).detail) : `API error ${res.status}`;
++    const raw = await res.text();
++    let detail: unknown = raw;
++    if (raw) { try { detail = JSON.parse(raw) as unknown; } catch { /* keep raw text */ } }
++    const message = typeof detail === "object" && detail && "detail" in detail ? String((detail as { detail: unknown }).detail) : (typeof detail === "string" && detail ? detail : `API error ${res.status}`);
+     throw new ApiError(message, res.status, detail);
+   }
+   if (res.status === 204) return undefined as T;
+@@ -73,8 +74,10 @@
+   const res = await fetch(`${API_URL}${path}`, { method: "POST", body: form, credentials: "include", cache: "no-store" });
+   if (res.status === 401 && !retried && await refreshBrowserSession()) return uploadRequest<T>(path, form, true);
+   if (!res.ok) {
+-    let detail: unknown; try { detail = await res.json(); } catch { detail = await res.text(); }
+-    const message = typeof detail === "object" && detail && "detail" in detail ? String((detail as { detail: unknown }).detail) : `API error ${res.status}`;
++    const raw = await res.text();
++    let detail: unknown = raw;
++    if (raw) { try { detail = JSON.parse(raw) as unknown; } catch { /* keep raw text */ } }
++    const message = typeof detail === "object" && detail && "detail" in detail ? String((detail as { detail: unknown }).detail) : (typeof detail === "string" && detail ? detail : `API error ${res.status}`);
+     throw new ApiError(message, res.status, detail);
+   }
+   return res.json() as Promise<T>;
