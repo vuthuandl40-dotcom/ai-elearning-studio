@@ -14,7 +14,7 @@ RUN printf '%s\n' \
   '  async rewrites() {' \
   '    return [{' \
   '      source: "/api/v1/:path*",' \
-  '      destination: "https://api-production-f81b.up.railway.app/api/v1/:path*",' \
+  '      destination: "http://api.railway.internal:8000/api/v1/:path*",' \
   '    }];' \
   '  },' \
   '};' \
