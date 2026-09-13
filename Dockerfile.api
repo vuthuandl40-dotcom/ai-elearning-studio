@@ -3,8 +3,51 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends xz-utils coreutils libreoffice-impress libreoffice-core fonts-dejavu-core curl ca-certificates patch && rm -rf /var/lib/apt/lists/*
 COPY deploy-source/ /tmp/deploy-source/
-RUN cat /tmp/deploy-source/source.b64.* | base64 -d > /tmp/source.tar.xz && echo "6d12efd05141a0f954ac1be2bcb644dcaee9771d0973757fde99d9ca0f80461a  /tmp/source.tar.xz" | sha256sum -c - && tar -xJf /tmp/source.tar.xz -C /app && patch -d /app -p1 < /tmp/deploy-source/patches/0003-embedded-job-worker.patch && rm -rf /tmp/deploy-source /tmp/source.tar.xz
+RUN cat /tmp/deploy-source/source.b64.* | base64 -d > /tmp/source.tar.xz \
+    && echo "6d12efd05141a0f954ac1be2bcb644dcaee9771d0973757fde99d9ca0f80461a  /tmp/source.tar.xz" | sha256sum -c - \
+    && tar -xJf /tmp/source.tar.xz -C /app \
+    && rm -rf /tmp/deploy-source /tmp/source.tar.xz
+RUN mkdir -p /app/app/scripts \
+    && touch /app/app/scripts/__init__.py \
+    && printf '%s\n' \
+      'from __future__ import annotations' \
+      '' \
+      'import argparse' \
+      'import logging' \
+      'import time' \
+      '' \
+      'from app.core.config import get_settings' \
+      'from app.db.session import get_session_factory' \
+      'from app.services.job_queue import claim_next_job, execute_job' \
+      '' \
+      'log = logging.getLogger("elearning.worker")' \
+      '' \
+      '' \
+      'def run(*, once: bool = False) -> int:' \
+      '    settings = get_settings()' \
+      '    factory = get_session_factory()' \
+      '    log.warning("job_worker_started poll_seconds=%s", settings.job_poll_seconds)' \
+      '    while True:' \
+      '        with factory() as db:' \
+      '            job = claim_next_job(db)' \
+      '            if job:' \
+      '                log.warning("job_started id=%s kind=%s project=%s attempt=%s", job.id, job.kind, job.project_id, job.attempts)' \
+      '                result = execute_job(db, job)' \
+      '                log.warning("job_finished id=%s status=%s", result.id, result.status)' \
+      '                if once:' \
+      '                    return 0 if result.status == "completed" else 1' \
+      '            elif once:' \
+      '                return 0' \
+      '        time.sleep(settings.job_poll_seconds)' \
+      '' \
+      '' \
+      'if __name__ == "__main__":' \
+      '    parser = argparse.ArgumentParser()' \
+      '    parser.add_argument("--once", action="store_true")' \
+      '    args = parser.parse_args()' \
+      '    raise SystemExit(run(once=args.once))' \
+      > /app/app/scripts/worker.py
 RUN pip install --upgrade pip && pip install -r requirements.txt
 RUN mkdir -p storage/uploads storage/media storage/exports
 EXPOSE 8000
-CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
+CMD ["sh", "-c", "alembic upgrade head && (python -m app.scripts.worker &) && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
