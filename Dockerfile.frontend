@@ -1,11 +1,25 @@
 FROM node:22-bookworm-slim AS builder
-ARG NEXT_PUBLIC_API_URL=https://api-production-f81b.up.railway.app
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=/api/v1
 WORKDIR /work
 RUN apt-get update && apt-get install -y --no-install-recommends xz-utils coreutils ca-certificates patch && rm -rf /var/lib/apt/lists/*
 COPY deploy-source/ /tmp/deploy-source/
 RUN cat /tmp/deploy-source/source.b64.* | base64 -d > /tmp/source.tar.xz && echo "6d12efd05141a0f954ac1be2bcb644dcaee9771d0973757fde99d9ca0f80461a  /tmp/source.tar.xz" | sha256sum -c - && mkdir -p /work/src && tar -xJf /tmp/source.tar.xz -C /work/src && patch -d /work/src -p1 < /tmp/deploy-source/patches/0001-lesson-editor-null-project.patch && rm -rf /tmp/deploy-source /tmp/source.tar.xz
 WORKDIR /work/src/frontend
+RUN printf '%s\n' \
+  'import type { NextConfig } from "next";' \
+  '' \
+  'const nextConfig: NextConfig = {' \
+  '  reactStrictMode: true,' \
+  '  output: "standalone",' \
+  '  async rewrites() {' \
+  '    return [{' \
+  '      source: "/api/v1/:path*",' \
+  '      destination: "https://api-production-f81b.up.railway.app/api/v1/:path*",' \
+  '    }];' \
+  '  },' \
+  '};' \
+  '' \
+  'export default nextConfig;' > next.config.ts
 RUN npm install
 RUN npm run build
 
