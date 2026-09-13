@@ -1,0 +1,62 @@
+--- a/frontend/lib/api.ts
++++ b/frontend/lib/api.ts
+@@ -101,6 +101,8 @@
+   waitForJob,
+   latestAnalysis: (projectId: string) => request<AnalysisRun>(`/projects/${projectId}/analysis/latest`),
+   latestPlan: (projectId: string) => request<PlanningRun>(`/projects/${projectId}/plan/latest`),
++  listObjectives: (projectId: string) => request<Array<{ id: string; objective_order: number; objective_text: string; is_teacher_approved: boolean }>>(`/projects/${projectId}/objectives`),
++  updateObjective: (objectiveId: string, value: { objective_text: string; is_teacher_approved?: boolean }) => request<{ id: string; objective_order: number; objective_text: string; is_teacher_approved: boolean }>(`/objectives/${objectiveId}`, { method: "PATCH", body: JSON.stringify(value) }),
+   approvePlan: (projectId: string, runId: string) => request<PlanningRun>(`/projects/${projectId}/plan/${runId}/approve`, { method: "POST" }),
+   login: (email: string, password: string) => request<TokenResponse>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+   register: (email: string, password: string, display_name: string, role: "teacher" | "student") => request<TokenResponse>("/auth/register", { method: "POST", body: JSON.stringify({ email, password, display_name, role }) }),
+--- a/frontend/app/projects/new/page.tsx
++++ b/frontend/app/projects/new/page.tsx
+@@ -17,6 +17,7 @@
+   const [files, setFiles] = useState<File[]>([]);
+   const [uploaded, setUploaded] = useState<string[]>([]);
+   const [plan, setPlan] = useState<PlanningRun | null>(null);
++  const [editableObjectives, setEditableObjectives] = useState<Array<{ id: string; objective_order: number; objective_text: string; is_teacher_approved: boolean }>>([]);
+   const [busy, setBusy] = useState("");
+   const [error, setError] = useState("");
+   const [progress, setProgress] = useState<BackgroundJob | null>(null);
+@@ -49,14 +50,29 @@
+       setStage("plan"); setProgress(null); setBusy("Đang lập kế hoạch sư phạm…");
+       const pjob = await api.createJob(project.id, "plan", { use_ai:true, preserve_teacher_edits:true });
+       await api.waitForJob(pjob.id, watch("Đang lập kế hoạch 15 phần"));
+-      const latest = await api.latestPlan(project.id); setPlan(latest); setStage("approve"); setBusy(""); setProgress(null);
++      const latest = await api.latestPlan(project.id);
++      const dbObjectives = await api.listObjectives(project.id);
++      setPlan(latest); setEditableObjectives(dbObjectives); setStage("approve"); setBusy(""); setProgress(null);
+     } catch(e) { fail(e); }
+   }
+ 
++  async function saveObjectiveEdits() {
++    if (!project || editableObjectives.length === 0) return;
++    setError(""); setBusy("Đang lưu mục tiêu…");
++    try {
++      const saved = await Promise.all(editableObjectives.map((o) => api.updateObjective(o.id, { objective_text: o.objective_text })));
++      setEditableObjectives(saved); setBusy("");
++    } catch(e) { fail(e); throw e; }
++  }
++
+   async function approveAndGenerate() {
+     if (!project || !plan) return;
+     setError(""); setBusy("Đang duyệt kế hoạch…");
+     try {
++      if (editableObjectives.length) {
++        const saved = await Promise.all(editableObjectives.map((o) => api.updateObjective(o.id, { objective_text: o.objective_text, is_teacher_approved: true })));
++        setEditableObjectives(saved);
++      }
+       await api.approvePlan(project.id, plan.id); setStage("generate");
+       const job = await api.createJob(project.id, "generate", { use_ai:true, preserve_teacher_edits:true, fallback_to_local:true });
+       await api.waitForJob(job.id, watch("AI đang sinh slide blueprint"));
+@@ -89,7 +105,8 @@
+       {["analyze","plan","generate"].includes(stage) && <section className="rounded-3xl border bg-white p-10 text-center shadow-sm"><div className="animate-pulse text-5xl">✨</div><h2 className="mt-5 text-xl font-black">{stage==="analyze"?"Đang phân tích tài liệu":stage==="plan"?"Đang xây kế hoạch 15 phần":"Đang sinh slide blueprint"}</h2><p className="mt-2 text-sm text-slate-500">Tác vụ được chạy bởi worker và có thể retry nếu provider tạm lỗi.</p></section>}
+ 
+       {stage==="approve" && <section className="rounded-3xl border bg-white p-6 shadow-sm"><h2 className="text-lg font-black">5. Duyệt kế hoạch sư phạm</h2><p className="mt-2 text-sm text-slate-500">AI đã tạo kế hoạch. Kiểm tra nhanh mục tiêu và 15 phần trước khi sinh slide.</p>
+-        <h3 className="mt-5 text-sm font-black">Yêu cầu cần đạt</h3><div className="mt-2 space-y-2">{objectives.map((o,i)=><div key={i} className="rounded-xl bg-slate-50 p-3 text-sm"><b>MT{i+1}.</b> {String(o.objective_text||o.text||"")}</div>)}</div>
++        <div className="mt-5 flex items-center justify-between gap-3"><h3 className="text-sm font-black">Yêu cầu cần đạt</h3>{editableObjectives.length>0&&<button disabled={!!busy} onClick={saveObjectiveEdits} className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-black text-violet-700 disabled:opacity-40">Lưu mục tiêu</button>}</div>
++        <div className="mt-2 space-y-2">{editableObjectives.length>0 ? editableObjectives.map((o,i)=><label key={o.id} className="block rounded-xl bg-slate-50 p-3 text-sm"><span className="mb-2 block font-black">MT{i+1}.</span><textarea value={o.objective_text} onChange={(e)=>setEditableObjectives((rows)=>rows.map((row)=>row.id===o.id?{...row,objective_text:e.target.value}:row))} className="input min-h-20 resize-y bg-white" /></label>) : objectives.map((o,i)=><div key={i} className="rounded-xl bg-slate-50 p-3 text-sm"><b>MT{i+1}.</b> {String(o.objective_text||o.text||"")}</div>)}</div>
+         <h3 className="mt-5 text-sm font-black">Cấu trúc 15 phần</h3><div className="mt-2 grid gap-2 md:grid-cols-2">{sections.map((s,i)=><div key={i} className="rounded-xl border border-slate-100 p-3"><div className="text-xs font-black text-violet-700">{String(s.section_order||i+1)}. {String(s.title||s.section_key||"")}</div><div className="mt-1 line-clamp-2 text-xs text-slate-500">{String(s.learning_goal||s.purpose||"")}</div></div>)}</div>
+         {plan?.warnings?.length?<div className="mt-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">{plan.warnings.join(" · ")}</div>:null}
+         <div className="mt-6 flex gap-2"><button onClick={()=>location.href=`/projects/${project?.id}/editor`} className="rounded-xl border px-4 py-3 text-sm font-bold">Mở project</button><button disabled={!!busy} onClick={approveAndGenerate} className="rounded-xl bg-violet-600 px-5 py-3 text-sm font-black text-white disabled:opacity-40">Duyệt & sinh bài giảng →</button></div>
