@@ -1,0 +1,11 @@
+--- a/app/services/lesson_writer/service.py
++++ b/app/services/lesson_writer/service.py
+@@ -654,6 +654,9 @@
+         section_draft = validate_and_repair_section(
+             section_draft, plan_section=effective_section_plan, valid_chunk_ids=set(chunks_by_id), source_policy=project.source_policy
+         )
++        from app.services.lesson_writer.v2 import enrich_section_v2
++        section_draft = enrich_section_v2(
++            section_draft, plan_section=effective_section_plan, chunks_by_id=chunks_by_id, project=project)
+         db.execute(delete(Slide).where(Slide.section_id == section.id))
+         db.flush()
