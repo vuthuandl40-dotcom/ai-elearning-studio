@@ -23,19 +23,30 @@ jobs:
           patch -d src -p1 < deploy-source/patches/0004-editable-objectives.patch
           patch -d src -p1 < deploy-source/patches/0005a-section-regeneration-backend.patch
           patch -d src -p1 < deploy-source/patches/0005b-section-regeneration-frontend.patch
+          patch -d src -p1 < deploy-source/patches/0006a-elearning-v2-backend.patch
       - name: Snapshot V2 target files
         run: |
-          mkdir -p v2-snapshot/app/services/lesson_writer v2-snapshot/app/schemas v2-snapshot/app/models v2-snapshot/frontend/lib v2-snapshot/frontend/components/editor
+          mkdir -p v2-snapshot/app/services/lesson_writer v2-snapshot/app/schemas v2-snapshot/app/db v2-snapshot/frontend/lib v2-snapshot/frontend/components/editor
           cp -a src/app/services/lesson_writer/. v2-snapshot/app/services/lesson_writer/
           cp -a src/app/schemas/generation.py v2-snapshot/app/schemas/ || true
-          cp -a src/app/schemas/slides.py v2-snapshot/app/schemas/ || true
-          cp -a src/app/models/. v2-snapshot/app/models/
+          cp -a src/app/db/models.py v2-snapshot/app/db/ || true
           cp -a src/frontend/lib/api.ts v2-snapshot/frontend/lib/
           cp -a src/frontend/lib/types.ts v2-snapshot/frontend/lib/ || true
           cp -a src/frontend/components/editor/Inspector.tsx v2-snapshot/frontend/components/editor/
           cp -a src/frontend/components/editor/LessonEditor.tsx v2-snapshot/frontend/components/editor/
+          echo '=== app structure ==='
+          find src/app -maxdepth 2 -type f | sort | head -120
+          echo '=== snapshot ==='
           find v2-snapshot -type f -maxdepth 8 -print | sort
+      - name: Python syntax check
+        working-directory: src
+        run: python -m compileall -q app
+      - name: Docker build API V2
+        run: docker build -f Dockerfile.api -t ai-elearning-api:v2 .
+      - name: Docker build frontend V2
+        run: docker build -f Dockerfile.frontend -t ai-elearning-frontend:v2 .
       - name: Commit snapshot
+        if: success()
         run: |
           git config user.name github-actions
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
