@@ -1,0 +1,37 @@
+name: V2 Inspect
+
+on:
+  push:
+    branches: [v2-dev]
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reconstruct current runtime source
+        run: |
+          cat deploy-source/source.b64.* | base64 -d > source.tar.xz
+          mkdir src
+          tar -xJf source.tar.xz -C src
+          patch -d src -p1 < deploy-source/patches/0001-lesson-editor-null-project.patch
+          patch -d src -p1 < deploy-source/patches/0002-safe-response-error-body.patch
+          patch -d src -p1 < deploy-source/patches/0004-editable-objectives.patch
+          patch -d src -p1 < deploy-source/patches/0005a-section-regeneration-backend.patch
+          patch -d src -p1 < deploy-source/patches/0005b-section-regeneration-frontend.patch
+      - name: Inspect V2 targets
+        working-directory: src
+        run: |
+          echo '=== LESSON WRITER FILES ==='
+          find app/services/lesson_writer -maxdepth 2 -type f -print | sort
+          echo '=== BLUEPRINT DEFINITIONS ==='
+          grep -R -n -E 'class (SlideBlueprint|SectionDraft|Interaction)|SlideBlueprint|SectionDraft' app/services app/schemas | head -120 || true
+          echo '=== MODELS ==='
+          grep -R -n -E 'class (Slide|Interaction|LessonSection)' app/models app | head -120 || true
+          echo '=== WRITER CONTRACTS ==='
+          for f in $(grep -R -l -E 'class SlideBlueprint|class SectionDraft' app/services app/schemas | head -10); do echo "--- $f"; sed -n '1,260p' "$f"; done
+          echo '=== SERVICE KEY REGIONS ==='
+          sed -n '1,760p' app/services/lesson_writer/service.py
+          echo '=== FRONTEND TYPES ==='
+          grep -R -n -E 'export (type|interface) (Slide|SlideBlueprint|Interaction|Section)' frontend/lib frontend/components | head -160 || true
+          for f in frontend/lib/types.ts frontend/lib/api.ts frontend/components/editor/Inspector.tsx frontend/components/editor/LessonEditor.tsx; do if [ -f "$f" ]; then echo "--- $f"; sed -n '1,320p' "$f"; fi; done
