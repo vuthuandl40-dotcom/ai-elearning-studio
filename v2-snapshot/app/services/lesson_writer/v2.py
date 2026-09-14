@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from app.services.lesson_writer.types import InteractionBlueprint
+
 V2_VERSION = "2.0"
 
 _ADMIN = (
@@ -46,7 +48,7 @@ def _ref_id(ref: Any) -> str | None:
     return str(value) if value else None
 
 
-def _source_facts(slide: Any, plan_section: dict[str, Any], chunks_by_id: dict[str, Any]) -> list[str]:
+def _source_ids(slide: Any, plan_section: dict[str, Any]) -> list[str]:
     ids: list[str] = []
     for ref in getattr(slide, "source_refs", []) or []:
         cid = _ref_id(ref)
@@ -56,8 +58,12 @@ def _source_facts(slide: Any, plan_section: dict[str, Any], chunks_by_id: dict[s
         value = str(cid)
         if value not in ids:
             ids.append(value)
+    return ids
+
+
+def _source_facts(slide: Any, plan_section: dict[str, Any], chunks_by_id: dict[str, Any]) -> list[str]:
     facts: list[str] = []
-    for cid in ids[:8]:
+    for cid in _source_ids(slide, plan_section)[:8]:
         chunk = chunks_by_id.get(cid)
         if not chunk:
             continue
@@ -107,11 +113,11 @@ def _profile(section_key: str) -> dict[str, str]:
         return {"bloom": "Apply–Evaluate", "purpose": "Vận dụng vào tình huống thực tiễn", "interaction": "scenario-response", "assessment": "performance"}
     if key == "summary":
         return {"bloom": "Understand–Evaluate", "purpose": "Tổ chức lại kiến thức và tự kiểm tra", "interaction": "concept-map-self-check", "assessment": "self-check"}
-    if key in {"intro", "warmup", "lead_in"}:
+    if key in {"introduction", "intro", "warmup", "lead_in"}:
         return {"bloom": "Engage", "purpose": "Tạo hứng thú và kích hoạt kiến thức nền", "interaction": "predict-poll-observe", "assessment": "diagnostic"}
     if key == "objectives":
         return {"bloom": "Orient", "purpose": "Làm rõ đích học tập", "interaction": "goal-check", "assessment": "none"}
-    if key in {"ending", "references"}:
+    if key in {"closing", "ending", "references"}:
         return {"bloom": "Reflect", "purpose": "Kết thúc và định hướng học tiếp", "interaction": "reflection", "assessment": "none"}
     return {"bloom": "Understand", "purpose": "Phát triển nội dung bài học", "interaction": "guided-observation", "assessment": "formative"}
 
@@ -166,6 +172,55 @@ def _teacher_script(existing: str, title: str, question: str) -> str:
     return script
 
 
+def _enhance_interaction(slide: Any, section_key: str, plan_section: dict[str, Any], chunks_by_id: dict[str, Any]) -> InteractionBlueprint | None:
+    current = getattr(slide, "interaction", None)
+    facts = _source_facts(slide, plan_section, chunks_by_id)
+    ids = _source_ids(slide, plan_section)
+    should_assess = section_key.startswith("interaction_") or section_key == "practice"
+
+    if current is None and should_assess and facts and ids:
+        statement = facts[0]
+        current = InteractionBlueprint(
+            interaction_type="true_false",
+            question=f"Dựa vào học liệu, nhận định sau đúng hay sai? “{statement}”",
+            options=["Đúng", "Sai"],
+            correct_answer="Đúng",
+            correct_feedback=f"Chính xác. Học liệu nêu: {statement}",
+            incorrect_feedback="Chưa chính xác. Hãy xem lại học liệu, tìm từ khóa liên quan rồi thử lại.",
+            explanation=statement,
+            difficulty="understand" if section_key.startswith("interaction_") else "apply",
+            points=1.0,
+            settings={"max_attempts": 2, "allow_retry": True, "show_hint_after_attempt": 1, "hint": "Tìm câu trong học liệu có cùng từ khóa với nhận định."},
+            source_chunk_ids=ids[:2],
+        )
+
+    if current is None:
+        return None
+
+    settings = dict(current.settings or {})
+    settings.setdefault("max_attempts", 2)
+    settings.setdefault("allow_retry", True)
+    settings.setdefault("show_hint_after_attempt", 1)
+    settings.setdefault("hint", "Đối chiếu lại học liệu và chú ý các từ khóa chính trước khi trả lời lại.")
+    settings["elearning_v2"] = True
+    correct = _clean(current.correct_feedback)
+    incorrect = _clean(current.incorrect_feedback)
+    explanation = _clean(current.explanation)
+    if len(correct) < 35:
+        correct = "Chính xác. Em đã xác định đúng thông tin trọng tâm trong học liệu."
+    if len(incorrect) < 45:
+        incorrect = "Chưa chính xác. Hãy đọc lại phần học liệu liên quan, đối chiếu từ khóa và thử lại."
+    if len(explanation) < 30 and facts:
+        explanation = facts[0]
+    return current.model_copy(update={
+        "correct_feedback": correct,
+        "incorrect_feedback": incorrect,
+        "explanation": explanation,
+        "settings": settings,
+        "source_chunk_ids": current.source_chunk_ids or ids[:2],
+    })
+
+
 def _copy(model: Any, updates: dict[str, Any]) -> Any:
     if hasattr(model, "model_copy"):
         return model.model_copy(update=updates)
@@ -190,6 +245,7 @@ def enrich_section_v2(section_draft: Any, *, plan_section: dict[str, Any], chunk
         if len(student) < 45:
             student = _student_action(profile, title)
         script = _teacher_script(str(getattr(slide, "teacher_script", "")), title, question)
+        interaction = _enhance_interaction(slide, section_key, plan_section, chunks_by_id)
         metadata = dict(getattr(slide, "metadata", {}) or {})
         metadata["elearning_v2"] = {
             "version": V2_VERSION,
@@ -204,12 +260,14 @@ def enrich_section_v2(section_draft: Any, *, plan_section: dict[str, Any], chunk
             "transition": "Chốt ý chính → kết nối với màn hình kế tiếp.",
             "source_safe": True,
             "content_depth": "rich" if len(bullets) >= 3 else "needs-review",
+            "scored_interaction": interaction is not None,
         }
         enriched.append(_copy(slide, {
             "onscreen_text": bullets or getattr(slide, "onscreen_text", []),
             "teacher_script": script,
             "student_instruction": student,
             "guiding_question": question,
+            "interaction": interaction,
             "metadata": metadata,
         }))
     result = _copy(section_draft, {"slides": enriched})
