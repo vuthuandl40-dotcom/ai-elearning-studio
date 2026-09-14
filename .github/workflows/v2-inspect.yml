@@ -4,6 +4,9 @@ on:
   push:
     branches: [v2-dev]
 
+permissions:
+  contents: write
+
 jobs:
   inspect:
     runs-on: ubuntu-latest
@@ -11,6 +14,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Reconstruct current runtime source
         run: |
+          rm -rf src v2-snapshot
           cat deploy-source/source.b64.* | base64 -d > source.tar.xz
           mkdir src
           tar -xJf source.tar.xz -C src
@@ -19,19 +23,24 @@ jobs:
           patch -d src -p1 < deploy-source/patches/0004-editable-objectives.patch
           patch -d src -p1 < deploy-source/patches/0005a-section-regeneration-backend.patch
           patch -d src -p1 < deploy-source/patches/0005b-section-regeneration-frontend.patch
-      - name: Inspect V2 targets
-        working-directory: src
+      - name: Snapshot V2 target files
         run: |
-          echo '=== LESSON WRITER FILES ==='
-          find app/services/lesson_writer -maxdepth 2 -type f -print | sort
-          echo '=== BLUEPRINT DEFINITIONS ==='
-          grep -R -n -E 'class (SlideBlueprint|SectionDraft|Interaction)|SlideBlueprint|SectionDraft' app/services app/schemas | head -120 || true
-          echo '=== MODELS ==='
-          grep -R -n -E 'class (Slide|Interaction|LessonSection)' app/models app | head -120 || true
-          echo '=== WRITER CONTRACTS ==='
-          for f in $(grep -R -l -E 'class SlideBlueprint|class SectionDraft' app/services app/schemas | head -10); do echo "--- $f"; sed -n '1,260p' "$f"; done
-          echo '=== SERVICE KEY REGIONS ==='
-          sed -n '1,760p' app/services/lesson_writer/service.py
-          echo '=== FRONTEND TYPES ==='
-          grep -R -n -E 'export (type|interface) (Slide|SlideBlueprint|Interaction|Section)' frontend/lib frontend/components | head -160 || true
-          for f in frontend/lib/types.ts frontend/lib/api.ts frontend/components/editor/Inspector.tsx frontend/components/editor/LessonEditor.tsx; do if [ -f "$f" ]; then echo "--- $f"; sed -n '1,320p' "$f"; fi; done
+          mkdir -p v2-snapshot/app/services/lesson_writer v2-snapshot/app/schemas v2-snapshot/app/models v2-snapshot/frontend/lib v2-snapshot/frontend/components/editor
+          cp -a src/app/services/lesson_writer/. v2-snapshot/app/services/lesson_writer/
+          cp -a src/app/schemas/generation.py v2-snapshot/app/schemas/ || true
+          cp -a src/app/schemas/slides.py v2-snapshot/app/schemas/ || true
+          cp -a src/app/models/. v2-snapshot/app/models/
+          cp -a src/frontend/lib/api.ts v2-snapshot/frontend/lib/
+          cp -a src/frontend/lib/types.ts v2-snapshot/frontend/lib/ || true
+          cp -a src/frontend/components/editor/Inspector.tsx v2-snapshot/frontend/components/editor/
+          cp -a src/frontend/components/editor/LessonEditor.tsx v2-snapshot/frontend/components/editor/
+          find v2-snapshot -type f -maxdepth 8 -print | sort
+      - name: Commit snapshot
+        run: |
+          git config user.name github-actions
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add v2-snapshot
+          if ! git diff --cached --quiet; then
+            git commit -m 'chore: snapshot runtime source for v2 development'
+            git push origin HEAD:v2-dev
+          fi
