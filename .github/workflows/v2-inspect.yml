@@ -23,7 +23,8 @@ jobs:
           patch -d src -p1 < deploy-source/patches/0004-editable-objectives.patch
           patch -d src -p1 < deploy-source/patches/0005a-section-regeneration-backend.patch
           patch -d src -p1 < deploy-source/patches/0005b-section-regeneration-frontend.patch
-          patch -d src -p1 < deploy-source/patches/0006a-elearning-v2-backend.patch
+          cp deploy-source/elearning_v2.py src/app/services/lesson_writer/v2.py
+          patch -d src -p1 < deploy-source/patches/0006b-hook-elearning-v2.patch
       - name: Snapshot V2 target files
         run: |
           mkdir -p v2-snapshot/app/services/lesson_writer v2-snapshot/app/schemas v2-snapshot/app/db v2-snapshot/frontend/lib v2-snapshot/frontend/components/editor
