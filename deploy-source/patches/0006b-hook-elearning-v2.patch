@@ -7,3 +7,4 @@
          section_draft = validate_and_repair_section(
              section_draft, plan_section=effective_section_plan, valid_chunk_ids=set(chunks_by_id), source_policy=project.source_policy
          )
+
