@@ -66,6 +66,8 @@ jobs:
         run: npm run build
       - name: Docker build API
         run: docker build -f Dockerfile.api -t ai-elearning-api:ci .
+      - name: V2 interaction regression smoke
+        run: docker run --rm --entrypoint python ai-elearning-api:ci -c "from types import SimpleNamespace as S; from app.services.lesson_writer.v2 import enrich_section_v2; d=S(section_key=\"interaction_3\",slides=[S(title=\"Smoke\",onscreen_text=[\"Nội dung trọng tâm\"],source_refs=[],interaction=None,teacher_script=\"\",student_instruction=\"\",guiding_question=\"\",metadata={})],warnings=[]); r=enrich_section_v2(d,plan_section={\"section_key\":\"interaction_3\",\"source_chunk_ids\":[]},chunks_by_id={},project=S()); assert r.slides[0].interaction is not None; print(\"v2-interaction-regression-smoke-ok\")"
       - name: Docker build frontend
         run: docker build --build-arg NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL" -f Dockerfile.frontend -t ai-elearning-frontend:ci .
       - name: Runtime smoke API container
