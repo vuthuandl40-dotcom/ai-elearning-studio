@@ -55,6 +55,17 @@ jobs:
         run: |
           python -m compileall -q app alembic
           python -c 'import app.main; print("backend-import-ok")'
+      - name: UI upgrade source probe
+        working-directory: src
+        run: |
+          echo "=== FRONTEND FILES ==="
+          find frontend/app frontend/components -maxdepth 4 -type f | sort
+          echo "=== HOME PAGE ==="
+          sed -n '1,240p' frontend/app/page.tsx || true
+          echo "=== PROJECT NEW ==="
+          sed -n '1,280p' frontend/app/projects/new/page.tsx || true
+          echo "=== LESSON EDITOR HEAD ==="
+          sed -n '1,260p' frontend/components/editor/LessonEditor.tsx || true
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
