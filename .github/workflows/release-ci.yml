@@ -55,6 +55,9 @@ jobs:
         run: |
           python -m compileall -q app alembic
           python -c 'import app.main; print("backend-import-ok")'
+      - name: Interaction schema probe
+        working-directory: src
+        run: python -c 'import json; from app.services.lesson_writer.types import InteractionBlueprint; print(json.dumps(InteractionBlueprint.model_json_schema(), ensure_ascii=False))'
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
