@@ -1,0 +1,30 @@
+--- a/frontend/app/learn/[assignmentId]/page.tsx
++++ b/frontend/app/learn/[assignmentId]/page.tsx
+@@ -30,5 +30,30 @@
+ function Question({item,number,value,setValue,feedback,onSubmit,busy}:{item:LearnerInteraction;number:number;value:unknown;setValue:(v:unknown)=>void;feedback?:{correct:boolean;text?:string|null};onSubmit:()=>void;busy:boolean}){
+-  const isMulti=item.interaction_type==="multiple_choice"; const opts=item.options||[];
+-  function toggle(v:unknown){if(!isMulti){setValue(v);return}const arr=Array.isArray(value)?[...value]:[];const k=JSON.stringify(v);const idx=arr.findIndex(x=>JSON.stringify(x)===k);if(idx>=0)arr.splice(idx,1);else arr.push(v);setValue(arr)}
+-  return <div className="rounded-3xl border bg-white p-5 shadow-sm"><div className="text-xs font-black uppercase tracking-wider text-violet-600">Câu {number} · {item.points} điểm</div><div className="mt-2 text-lg font-black">{item.question}</div>{opts.length>0?<div className="mt-4 grid gap-2">{opts.map((o,n)=>{const ov=typeof o==="object"&&o&&"value" in o?(o as any).value:o;const label=typeof o==="object"&&o&&"label" in o?(o as any).label:String(o);const selected=isMulti?Array.isArray(value)&&value.some(x=>JSON.stringify(x)===JSON.stringify(ov)):JSON.stringify(value)===JSON.stringify(ov);return <button key={n} disabled={!!feedback} onClick={()=>toggle(ov)} className={`rounded-xl border px-4 py-3 text-left text-sm font-semibold ${selected?"border-violet-500 bg-violet-50 text-violet-800":"border-slate-200"}`}>{label}</button>})}</div>:<input disabled={!!feedback} className="input mt-4" placeholder="Nhập câu trả lời" value={typeof value==="string"?value:""} onChange={e=>setValue(e.target.value)}/>}<div className="mt-4 flex items-center gap-3"><button disabled={value===undefined||!!feedback||busy} onClick={onSubmit} className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-black text-white disabled:opacity-30">Trả lời</button>{feedback&&<div className={`text-sm font-bold ${feedback.correct?"text-emerald-700":"text-rose-700"}`}>{feedback.correct?"✓ Chính xác":"✕ Chưa đúng"}{feedback.text?` · ${feedback.text}`:""}</div>}</div></div>
++  const kind=item.interaction_type||"single_choice";
++  const isMulti=kind==="multiple_choice";
++  const isText=kind==="fill_blank";
++  const opts=item.options||[];
++  function toggle(v:unknown){
++    if(!isMulti){setValue(v);return}
++    const arr=Array.isArray(value)?[...value]:[];
++    const k=JSON.stringify(v);
++    const idx=arr.findIndex(x=>JSON.stringify(x)===k);
++    if(idx>=0)arr.splice(idx,1);else arr.push(v);
++    setValue(arr);
++  }
++  const answered=isMulti?Array.isArray(value)&&value.length>0:isText?typeof value==="string"&&value.trim().length>0:value!==undefined;
++  const typeLabel=kind==="true_false"?"Đúng / Sai":kind==="fill_blank"?"Điền khuyết":kind==="multiple_choice"?"Chọn nhiều đáp án":"Chọn một đáp án";
++  return <div className="rounded-3xl border bg-white p-5 shadow-sm">
++    <div className="flex items-center justify-between gap-3"><div className="text-xs font-black uppercase tracking-wider text-violet-600">Câu {number} · {item.points} điểm</div><div className="rounded-full bg-violet-50 px-3 py-1 text-[10px] font-black text-violet-700">{typeLabel}</div></div>
++    <div className="mt-2 text-lg font-black">{item.question}</div>
++    {isText?<div className="mt-4"><input disabled={!!feedback} className="input" placeholder="Nhập từ hoặc cụm từ còn thiếu…" value={typeof value==="string"?value:""} onChange={e=>setValue(e.target.value)}/><div className="mt-2 text-[11px] text-slate-400">Nhập ngắn gọn đúng theo nội dung bài học.</div></div>:
++    opts.length>0?<div className="mt-4 grid gap-2">{opts.map((o,n)=>{const ov=typeof o==="object"&&o&&"value" in o?(o as any).value:o;const label=typeof o==="object"&&o&&"label" in o?(o as any).label:String(o);const selected=isMulti?Array.isArray(value)&&value.some(x=>JSON.stringify(x)===JSON.stringify(ov)):JSON.stringify(value)===JSON.stringify(ov);return <button key={n} disabled={!!feedback} onClick={()=>toggle(ov)} className={`rounded-xl border px-4 py-3 text-left text-sm font-semibold transition ${selected?"border-violet-500 bg-violet-50 text-violet-800":"border-slate-200 hover:border-violet-300 hover:bg-violet-50/50"}`}>{label}</button>})}</div>:
++    <input disabled={!!feedback} className="input mt-4" placeholder="Nhập câu trả lời" value={typeof value==="string"?value:""} onChange={e=>setValue(e.target.value)}/>}
++    <div className="mt-4 flex flex-wrap items-center gap-3"><button disabled={!answered||!!feedback||busy} onClick={onSubmit} className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-black text-white disabled:opacity-30">Trả lời</button>{feedback&&<div className={`rounded-xl px-3 py-2 text-sm font-bold ${feedback.correct?"bg-emerald-50 text-emerald-700":"bg-rose-50 text-rose-700"}`}>{feedback.correct?"✓ Chính xác":"✕ Chưa đúng"}{feedback.text?` · ${feedback.text}`:""}</div>}</div>
++  </div>
+ }
