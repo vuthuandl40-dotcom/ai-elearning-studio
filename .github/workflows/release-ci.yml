@@ -55,15 +55,6 @@ jobs:
         run: |
           python -m compileall -q app alembic
           python -c 'import app.main; print("backend-import-ok")'
-      - name: V2 remaining-screen probe
-        working-directory: src
-        run: |
-          echo "=== LOGIN ==="
-          sed -n '1,360p' frontend/app/login/page.tsx || true
-          echo "=== LEARN DETAIL ==="
-          sed -n '1,520p' 'frontend/app/learn/[assignmentId]/page.tsx' || true
-          echo "=== GLOBALS ==="
-          sed -n '1,300p' frontend/app/globals.css || true
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
