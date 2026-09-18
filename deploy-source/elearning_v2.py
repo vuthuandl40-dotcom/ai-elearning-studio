@@ -227,6 +227,106 @@ def _teacher_script(existing: str, title: str, question: str, profile: dict[str,
         script += " Sau khi học sinh trả lời, giáo viên chốt bằng chứng chính, sửa hiểu nhầm nếu có và chuyển sang nhiệm vụ kế tiếp."
     return script
 
+def _fill_blank_from_statement(statement: str) -> tuple[str, str] | None:
+    words = re.findall(r"[^\W\d_]{6,}", statement or "", flags=re.UNICODE)
+    candidates = [w for w in words if w.lower() not in {"những", "chúng", "trong", "được", "không", "người", "thông", "nội dung", "trường"}]
+    if not candidates:
+        return None
+    answer = max(candidates, key=len)
+    question = re.sub(rf"\b{re.escape(answer)}\b", "_____", statement, count=1)
+    if question == statement:
+        return None
+    return question, answer
+
+
+def _fallback_interaction(
+    *,
+    section_key: str,
+    title: str,
+    facts: list[str],
+    bullets: list[str],
+    ids: list[str],
+) -> InteractionBlueprint:
+    pool: list[str] = []
+    for value in [*facts, *bullets]:
+        item = _clean(value)
+        if item and item not in pool:
+            pool.append(item)
+
+    statement = pool[0] if pool else f"Phần này tập trung vào nội dung: {title}."
+    difficulty = "understand" if section_key.startswith("interaction_") else "apply"
+    base_settings = {
+        "max_attempts": 2,
+        "allow_retry": True,
+        "show_hint_after_attempt": 1,
+        "v2_generated_interaction": True,
+    }
+
+    if section_key == "interaction_2":
+        blank = _fill_blank_from_statement(statement)
+        if blank:
+            question_text, answer = blank
+            return InteractionBlueprint(
+                interaction_type="fill_blank",
+                question=f"Điền từ còn thiếu dựa vào học liệu: “{question_text}”",
+                options=[],
+                correct_answer=answer,
+                correct_feedback=f"Chính xác. Từ cần điền là “{answer}”.",
+                incorrect_feedback="Chưa chính xác. Hãy đọc lại câu trong học liệu và chú ý từ khóa bị khuyết.",
+                explanation=statement,
+                difficulty="understand",
+                points=1.0,
+                settings={**base_settings, "hint": "Tìm đúng câu có cấu trúc gần giống trong học liệu."},
+                source_chunk_ids=ids[:2],
+            )
+
+    if section_key == "interaction_3" and len(pool) >= 2:
+        options = pool[:4]
+        return InteractionBlueprint(
+            interaction_type="single_choice",
+            question=f"Ý nào dưới đây được dùng làm ý trọng tâm đầu tiên để làm rõ nội dung “{title}”?",
+            options=options,
+            correct_answer=options[0],
+            correct_feedback="Chính xác. Đây là ý trọng tâm được ưu tiên ở màn hình này.",
+            incorrect_feedback="Chưa chính xác. Hãy đối chiếu thứ tự các ý chính trên màn hình rồi thử lại.",
+            explanation=options[0],
+            difficulty="analyze",
+            points=1.0,
+            settings={**base_settings, "hint": "Chú ý ý xuất hiện đầu tiên trong phần nội dung trọng tâm."},
+            source_chunk_ids=ids[:2],
+        )
+
+    if section_key == "practice" and len(pool) >= 2:
+        options = pool[:4]
+        return InteractionBlueprint(
+            interaction_type="multiple_choice",
+            question=f"Chọn các ý xuất hiện trực tiếp trong nội dung luyện tập về “{title}”.",
+            options=options,
+            correct_answer=options,
+            correct_feedback="Chính xác. Em đã nhận diện đầy đủ các ý có trong học liệu.",
+            incorrect_feedback="Chưa đủ hoặc có lựa chọn chưa phù hợp. Hãy đối chiếu từng phương án với học liệu rồi thử lại.",
+            explanation="Các phương án đúng đều được lấy trực tiếp từ nội dung màn hình/học liệu.",
+            difficulty="apply",
+            points=1.0,
+            settings={**base_settings, "hint": "Đối chiếu từng phương án với nội dung vừa học; không chọn theo suy đoán."},
+            source_chunk_ids=ids[:2],
+        )
+
+    return InteractionBlueprint(
+        interaction_type="true_false",
+        question=f"Dựa vào nội dung bài học, nhận định sau đúng hay sai? “{statement}”",
+        options=["Đúng", "Sai"],
+        correct_answer="Đúng",
+        correct_feedback=f"Chính xác. Nội dung trọng tâm là: {statement}",
+        incorrect_feedback="Chưa chính xác. Hãy xem lại nội dung trên màn hình, đối chiếu từ khóa rồi thử lại.",
+        explanation=statement,
+        difficulty=difficulty,
+        points=1.0,
+        settings={**base_settings, "hint": "Đối chiếu nhận định với nội dung chính trên màn hình trước khi trả lời lại."},
+        source_chunk_ids=ids[:2],
+    )
+
+
 def _enhance_interaction(slide: Any, section_key: str, plan_section: dict[str, Any], chunks_by_id: dict[str, Any]) -> InteractionBlueprint | None:
     current = getattr(slide, "interaction", None)
     facts = _source_facts(slide, plan_section, chunks_by_id)
@@ -236,25 +336,12 @@ def _enhance_interaction(slide: Any, section_key: str, plan_section: dict[str, A
     if current is None and should_assess:
         bullets = _existing_bullets(slide)
         title = _clean(str(getattr(slide, "title", ""))) or "nội dung bài học"
-        statement = facts[0] if facts else (bullets[0] if bullets else f"Phần này tập trung vào nội dung: {title}.")
-        current = InteractionBlueprint(
-            interaction_type="true_false",
-            question=f"Dựa vào nội dung bài học, nhận định sau đúng hay sai? “{statement}”",
-            options=["Đúng", "Sai"],
-            correct_answer="Đúng",
-            correct_feedback=f"Chính xác. Nội dung trọng tâm là: {statement}",
-            incorrect_feedback="Chưa chính xác. Hãy xem lại nội dung trên màn hình, đối chiếu từ khóa rồi thử lại.",
-            explanation=statement,
-            difficulty="understand" if section_key.startswith("interaction_") else "apply",
-            points=1.0,
-            settings={
-                "max_attempts": 2,
-                "allow_retry": True,
-                "show_hint_after_attempt": 1,
-                "hint": "Đối chiếu nhận định với nội dung chính trên màn hình trước khi trả lời lại.",
-                "v2_fallback_interaction": not bool(facts),
-            },
-            source_chunk_ids=ids[:2],
+        current = _fallback_interaction(
+            section_key=section_key,
+            title=title,
+            facts=facts,
+            bullets=bullets,
+            ids=ids,
         )
 
     if current is None:
