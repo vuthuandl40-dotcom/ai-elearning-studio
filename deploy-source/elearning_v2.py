@@ -178,19 +178,27 @@ def _enhance_interaction(slide: Any, section_key: str, plan_section: dict[str, A
     ids = _source_ids(slide, plan_section)
     should_assess = section_key.startswith("interaction_") or section_key == "practice"
 
-    if current is None and should_assess and facts and ids:
-        statement = facts[0]
+    if current is None and should_assess:
+        bullets = _existing_bullets(slide)
+        title = _clean(str(getattr(slide, "title", ""))) or "nội dung bài học"
+        statement = facts[0] if facts else (bullets[0] if bullets else f"Phần này tập trung vào nội dung: {title}.")
         current = InteractionBlueprint(
             interaction_type="true_false",
-            question=f"Dựa vào học liệu, nhận định sau đúng hay sai? “{statement}”",
+            question=f"Dựa vào nội dung bài học, nhận định sau đúng hay sai? “{statement}”",
             options=["Đúng", "Sai"],
             correct_answer="Đúng",
-            correct_feedback=f"Chính xác. Học liệu nêu: {statement}",
-            incorrect_feedback="Chưa chính xác. Hãy xem lại học liệu, tìm từ khóa liên quan rồi thử lại.",
+            correct_feedback=f"Chính xác. Nội dung trọng tâm là: {statement}",
+            incorrect_feedback="Chưa chính xác. Hãy xem lại nội dung trên màn hình, đối chiếu từ khóa rồi thử lại.",
             explanation=statement,
             difficulty="understand" if section_key.startswith("interaction_") else "apply",
             points=1.0,
-            settings={"max_attempts": 2, "allow_retry": True, "show_hint_after_attempt": 1, "hint": "Tìm câu trong học liệu có cùng từ khóa với nhận định."},
+            settings={
+                "max_attempts": 2,
+                "allow_retry": True,
+                "show_hint_after_attempt": 1,
+                "hint": "Đối chiếu nhận định với nội dung chính trên màn hình trước khi trả lời lại.",
+                "v2_fallback_interaction": not bool(facts),
+            },
             source_chunk_ids=ids[:2],
         )
 
