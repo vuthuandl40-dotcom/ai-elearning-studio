@@ -58,14 +58,14 @@ jobs:
       - name: UI upgrade source probe
         working-directory: src
         run: |
-          echo "=== TOP BAR ==="
-          sed -n '1,260p' frontend/components/editor/TopBar.tsx || true
-          echo "=== SECTION SIDEBAR ==="
-          sed -n '1,320p' frontend/components/editor/SectionSidebar.tsx || true
-          echo "=== SLIDE STAGE ==="
-          sed -n '1,360p' frontend/components/editor/SlideStage.tsx || true
-          echo "=== INSPECTOR ==="
-          sed -n '1,360p' frontend/components/editor/Inspector.tsx || true
+          echo "=== CLASSROOMS ==="
+          sed -n '1,360p' frontend/app/classrooms/page.tsx || true
+          echo "=== CLASSROOM DETAIL ==="
+          sed -n '1,420p' 'frontend/app/classrooms/[classroomId]/page.tsx' || true
+          echo "=== LEARN LIST ==="
+          sed -n '1,360p' frontend/app/learn/page.tsx || true
+          echo "=== ANALYTICS ==="
+          sed -n '1,420p' frontend/components/analytics/AnalyticsDashboard.tsx || true
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
