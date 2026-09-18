@@ -43,3 +43,19 @@ for (const rel of [
   x = x.replace("Analytics · ", "Báo cáo & Analytics · ");
   fs.writeFileSync(p, x);
 }
+
+for (const rel of [
+  "frontend/app/learn/page.tsx",
+  "frontend/app/learn/[assignmentId]/page.tsx",
+]) {
+  const p = path.join(root, rel);
+  let x = fs.readFileSync(p, "utf8");
+  x = x.replaceAll("bg-slate-100", "bg-[#f6f8fe]");
+  x = x.replaceAll("violet-", "indigo-");
+  x = x.replace('min-h-screen bg-[#f6f8fe]', 'min-h-screen bg-[#f6f8fe] pb-20 md:pb-0');
+  if (!x.includes("Mobile learner nav")) {
+    const mobileNav = '<div aria-label="Mobile learner nav" className="fixed inset-x-3 bottom-3 z-50 flex items-center justify-around rounded-2xl border border-indigo-100 bg-white/95 p-2 shadow-2xl backdrop-blur md:hidden"><button onClick={()=>location.href="/"} className="rounded-xl px-3 py-2 text-[10px] font-black text-slate-500">⌂<span className="mt-0.5 block">Trang chủ</span></button><button onClick={()=>location.href="/learn"} className="rounded-xl bg-indigo-50 px-4 py-2 text-[10px] font-black text-indigo-700">▣<span className="mt-0.5 block">Bài học</span></button><button onClick={()=>location.href="/classrooms"} className="rounded-xl px-3 py-2 text-[10px] font-black text-slate-500">♙<span className="mt-0.5 block">Lớp học</span></button><button onClick={()=>location.href="/login"} className="rounded-xl px-3 py-2 text-[10px] font-black text-slate-500">●<span className="mt-0.5 block">Cá nhân</span></button></div>';
+    x = x.replace(/<\/main>\s*}\s*$/, mobileNav + '</main>}');
+  }
+  fs.writeFileSync(p, x);
+}
