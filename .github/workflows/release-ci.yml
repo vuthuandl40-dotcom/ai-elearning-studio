@@ -55,6 +55,11 @@ jobs:
         run: |
           python -m compileall -q app alembic
           python -c 'import app.main; print("backend-import-ok")'
+      - name: Frontend interaction renderer probe
+        working-directory: src
+        run: |
+          echo "=== interaction type references ==="
+          grep -RInE 'interaction_type|single_choice|multiple_choice|true_false|fill_blank|matching|drag_drop' frontend --exclude-dir=node_modules || true
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
