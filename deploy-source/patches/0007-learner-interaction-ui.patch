@@ -1,6 +1,6 @@
 --- a/frontend/app/learn/[assignmentId]/page.tsx
 +++ b/frontend/app/learn/[assignmentId]/page.tsx
-@@ -30,5 +30,30 @@
+@@ -31,3 +31,22 @@
  function Question({item,number,value,setValue,feedback,onSubmit,busy}:{item:LearnerInteraction;number:number;value:unknown;setValue:(v:unknown)=>void;feedback?:{correct:boolean;text?:string|null};onSubmit:()=>void;busy:boolean}){
 -  const isMulti=item.interaction_type==="multiple_choice"; const opts=item.options||[];
 -  function toggle(v:unknown){if(!isMulti){setValue(v);return}const arr=Array.isArray(value)?[...value]:[];const k=JSON.stringify(v);const idx=arr.findIndex(x=>JSON.stringify(x)===k);if(idx>=0)arr.splice(idx,1);else arr.push(v);setValue(arr)}
