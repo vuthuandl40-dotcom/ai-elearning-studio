@@ -5,7 +5,7 @@ from typing import Any
 
 from app.services.lesson_writer.types import InteractionBlueprint
 
-V2_VERSION = "2.0"
+V2_VERSION = "2.1"
 
 _ADMIN = (
     "chương ", "tên bài dạy", "môn học:", "thiết bị dạy học", "học liệu",
@@ -89,9 +89,19 @@ def _existing_bullets(slide: Any) -> list[str]:
     return out
 
 
-def _rich_bullets(slide: Any, plan_section: dict[str, Any], chunks_by_id: dict[str, Any]) -> list[str]:
+def _rich_bullets(
+    slide: Any,
+    plan_section: dict[str, Any],
+    chunks_by_id: dict[str, Any],
+    *,
+    slide_index: int = 0,
+) -> list[str]:
     bullets = _existing_bullets(slide)
-    for fact in _source_facts(slide, plan_section, chunks_by_id):
+    facts = _source_facts(slide, plan_section, chunks_by_id)
+    if facts:
+        shift = (max(0, slide_index) * 2) % len(facts)
+        facts = facts[shift:] + facts[:shift]
+    for fact in facts:
         if len(bullets) >= 4:
             break
         low = fact.lower()
@@ -122,55 +132,100 @@ def _profile(section_key: str) -> dict[str, str]:
     return {"bloom": "Understand", "purpose": "Phát triển nội dung bài học", "interaction": "guided-observation", "assessment": "formative"}
 
 
-def _guiding(title: str, profile: dict[str, str]) -> str:
-    if profile["interaction"] == "mcq-with-feedback":
-        return f"Em chọn phương án nào về {title.lower()} và vì sao?"
-    if profile["interaction"] == "scenario-response":
-        return f"Em sẽ vận dụng kiến thức về {title.lower()} như thế nào trong tình huống thực tiễn?"
-    if profile["interaction"] == "classify-match-sequence":
-        return f"Em có thể phân loại hoặc ghép các thông tin về {title.lower()} theo tiêu chí nào?"
-    return f"Từ học liệu, em phát hiện điều gì quan trọng về {title.lower()}?"
+def _guiding(title: str, profile: dict[str, str], bullets: list[str]) -> str:
+    pattern = profile["interaction"]
+    if pattern == "observe-compare-reveal":
+        return f"Những thông tin nào giúp em giải thích rõ nhất về {title.lower()}, và chúng liên hệ với nhau như thế nào?"
+    if pattern == "mcq-with-feedback":
+        return f"Em dựa vào chi tiết nào trong học liệu để chọn phương án đúng về {title.lower()}?"
+    if pattern == "classify-match-sequence":
+        return f"Em sẽ dùng tiêu chí nào để phân loại, ghép hoặc sắp xếp thông tin về {title.lower()}?"
+    if pattern == "scenario-response":
+        return f"Nếu gặp một tình huống thực tế liên quan đến {title.lower()}, em sẽ lựa chọn cách xử lí nào và căn cứ vào kiến thức nào?"
+    if pattern == "concept-map-self-check":
+        return f"Ba ý nào cần có trong sơ đồ tóm tắt về {title.lower()}, và ý nào em còn chưa chắc?"
+    if pattern == "predict-poll-observe":
+        return f"Trước khi học sâu hơn, em dự đoán điều gì về {title.lower()} và căn cứ vào dấu hiệu nào?"
+    if bullets:
+        return f"Từ các ý trên, em rút ra kết luận quan trọng nào về {title.lower()}?"
+    return f"Em cần ghi nhớ điều gì quan trọng nhất về {title.lower()}?"
 
 
 def _student_action(profile: dict[str, str], title: str) -> str:
     pattern = profile["interaction"]
     if pattern == "observe-compare-reveal":
-        return f"Quan sát học liệu về {title.lower()}, ghi 2 phát hiện, sau đó so sánh và trao đổi với bạn."
+        return f"Quan sát học liệu về {title.lower()}, ghi 2 phát hiện, chọn 1 bằng chứng hỗ trợ và nêu kết luận bằng 1–2 câu."
     if pattern == "mcq-with-feedback":
-        return "Chọn đáp án, giải thích lựa chọn, đọc phản hồi và sửa lại nếu cần."
+        return "Chọn đáp án, chỉ ra từ khóa/bằng chứng đã dùng, đọc phản hồi và sửa lại câu trả lời nếu cần."
     if pattern == "classify-match-sequence":
-        return "Hoàn thành nhiệm vụ ghép/phân loại, đối chiếu đáp án và giải thích ít nhất một lựa chọn."
+        return "Hoàn thành nhiệm vụ ghép/phân loại/sắp xếp, kiểm tra lại kết quả và giải thích ít nhất một lựa chọn."
     if pattern == "scenario-response":
-        return "Phân tích tình huống, đề xuất phương án, nêu căn cứ và đánh giá hệ quả."
+        return "Phân tích tình huống, đề xuất phương án, nêu căn cứ từ bài học và dự đoán một hệ quả có thể xảy ra."
     if pattern == "concept-map-self-check":
-        return "Hoàn thiện sơ đồ kiến thức và tự đánh dấu nội dung đã hiểu/chưa chắc."
+        return "Hoàn thiện sơ đồ 3 ý chính, viết 1 câu kết luận và tự đánh dấu nội dung đã hiểu/chưa chắc."
     if pattern == "predict-poll-observe":
-        return "Quan sát tình huống, đưa ra dự đoán ban đầu và nêu một lí do."
-    return "Đọc/quan sát học liệu, trả lời câu hỏi gợi mở và ghi lại ý chính."
+        return "Quan sát tình huống, đưa ra dự đoán ban đầu, nêu một lí do và đối chiếu lại dự đoán sau khi học."
+    if pattern == "goal-check":
+        return "Đọc mục tiêu, chọn nội dung mình đã biết/chưa biết và xác định một điều muốn trả lời sau bài học."
+    if pattern == "reflection":
+        return "Viết một điều đã hiểu rõ, một điều còn băn khoăn và một việc sẽ làm tiếp theo."
+    return "Đọc/quan sát học liệu, ghi ý chính, trả lời câu hỏi gợi mở và nêu một bằng chứng từ nội dung bài học."
 
 
 def _feedback(profile: dict[str, str]) -> str:
     if profile["assessment"] == "formative":
-        return "Phản hồi ngay: xác nhận phần đúng, chỉ ra điểm cần sửa và giải thích ngắn dựa trên học liệu."
+        return "Phản hồi ngay theo 3 bước: xác nhận ý đúng → chỉ ra từ khóa/bằng chứng → gợi ý cách sửa phần chưa đúng."
     if profile["assessment"] == "practice":
-        return "Cho phép thử lại; sau mỗi lần trả lời hiển thị gợi ý thay vì chỉ báo đúng/sai."
+        return "Cho phép thử lại; lần 1 gợi ý từ khóa, lần 2 chỉ vùng nội dung cần xem lại, sau đó mới hiển thị giải thích đầy đủ."
     if profile["assessment"] == "performance":
-        return "Dùng tiêu chí: đúng kiến thức, có căn cứ, phù hợp thực tiễn và cân nhắc tác động."
+        return "Phản hồi theo tiêu chí: đúng kiến thức, có căn cứ, phù hợp tình huống và giải thích được hệ quả."
     if profile["assessment"] == "self-check":
-        return "Hiển thị đáp án mẫu/sơ đồ chuẩn sau khi người học tự hoàn thành."
-    return "Không chấm điểm; dùng phản hồi định hướng để dẫn sang màn hình tiếp theo."
+        return "Cho người học tự đánh giá trước, sau đó hiển thị sơ đồ/đáp án mẫu để so sánh và bổ sung."
+    return "Không chấm điểm; phản hồi ngắn giúp người học biết mình cần chú ý điều gì ở màn hình kế tiếp."
 
 
-def _teacher_script(existing: str, title: str, question: str) -> str:
+def _learning_evidence(profile: dict[str, str]) -> str:
+    pattern = profile["interaction"]
+    if pattern == "observe-compare-reveal":
+        return "2 phát hiện + 1 bằng chứng + 1 kết luận ngắn"
+    if pattern == "mcq-with-feedback":
+        return "1 lựa chọn + 1 căn cứ từ học liệu"
+    if pattern == "classify-match-sequence":
+        return "Kết quả ghép/phân loại/sắp xếp + giải thích một lựa chọn"
+    if pattern == "scenario-response":
+        return "Phương án xử lí + căn cứ + hệ quả dự kiến"
+    if pattern == "concept-map-self-check":
+        return "Sơ đồ 3 ý chính + 1 câu kết luận + tự đánh giá"
+    if pattern == "predict-poll-observe":
+        return "Dự đoán ban đầu + lí do + đối chiếu sau học"
+    return "Ý chính ghi lại + câu trả lời cho câu hỏi gợi mở"
+
+
+def _teacher_script(existing: str, title: str, question: str, profile: dict[str, str], bullets: list[str]) -> str:
     script = _clean(existing)
-    if len(script) < 70:
-        script = f"Các em tập trung vào {title.lower()}. Trước hết hãy quan sát học liệu và xác định những thông tin nổi bật."
+    if len(script) < 90:
+        if profile["interaction"] == "predict-poll-observe":
+            script = f"Các em chưa cần trả lời ngay. Hãy quan sát tình huống về {title.lower()}, dự đoán điều có thể xảy ra và nêu lí do cho dự đoán của mình."
+        elif profile["interaction"] == "observe-compare-reveal":
+            script = f"Các em tập trung vào {title.lower()}. Hãy quan sát học liệu, tìm các chi tiết nổi bật và thử nối chúng thành một nhận xét có căn cứ."
+        elif profile["interaction"] == "classify-match-sequence":
+            script = f"Ở phần {title.lower()}, nhiệm vụ của các em là tổ chức lại thông tin thay vì chỉ nhớ từng ý rời rạc."
+        elif profile["interaction"] == "scenario-response":
+            script = f"Bây giờ chúng ta chuyển kiến thức về {title.lower()} sang một tình huống gần thực tế để kiểm tra khả năng vận dụng."
+        elif profile["interaction"] == "concept-map-self-check":
+            script = f"Trước khi kết thúc, các em hãy hệ thống lại {title.lower()} bằng các ý thật ngắn và tự kiểm tra phần mình còn chưa chắc."
+        else:
+            script = f"Các em tập trung vào {title.lower()}. Hãy đọc hoặc quan sát học liệu và xác định thông tin quan trọng nhất."
+
+    key_points = [x for x in bullets[:3] if x and x.lower() not in script.lower()]
+    if key_points:
+        script += " Các ý cần chốt gồm: " + " ".join(f"{i + 1}) {item}" for i, item in enumerate(key_points)) + "."
+
     if "?" not in script:
         script += f" {question}"
     if "chuyển" not in script.lower():
-        script += " Sau khi trao đổi, chúng ta chốt ý chính và chuyển sang nhiệm vụ tiếp theo."
+        script += " Sau khi học sinh trả lời, giáo viên chốt bằng chứng chính, sửa hiểu nhầm nếu có và chuyển sang nhiệm vụ kế tiếp."
     return script
-
 
 def _enhance_interaction(slide: Any, section_key: str, plan_section: dict[str, Any], chunks_by_id: dict[str, Any]) -> InteractionBlueprint | None:
     current = getattr(slide, "interaction", None)
@@ -247,12 +302,12 @@ def enrich_section_v2(section_draft: Any, *, plan_section: dict[str, Any], chunk
     enriched: list[Any] = []
     for index, slide in enumerate(getattr(section_draft, "slides", []) or []):
         title = _clean(str(getattr(slide, "title", ""))) or f"Màn hình {index + 1}"
-        bullets = _rich_bullets(slide, plan_section, chunks_by_id)
-        question = _clean(str(getattr(slide, "guiding_question", ""))) or _guiding(title, profile)
+        bullets = _rich_bullets(slide, plan_section, chunks_by_id, slide_index=index)
+        question = _clean(str(getattr(slide, "guiding_question", ""))) or _guiding(title, profile, bullets)
         student = _clean(str(getattr(slide, "student_instruction", "")))
         if len(student) < 45:
             student = _student_action(profile, title)
-        script = _teacher_script(str(getattr(slide, "teacher_script", "")), title, question)
+        script = _teacher_script(str(getattr(slide, "teacher_script", "")), title, question, profile, bullets)
         interaction = _enhance_interaction(slide, section_key, plan_section, chunks_by_id)
         metadata = dict(getattr(slide, "metadata", {}) or {})
         metadata["elearning_v2"] = {
@@ -263,9 +318,11 @@ def enrich_section_v2(section_draft: Any, *, plan_section: dict[str, Any], chunk
             "assessment_role": profile["assessment"],
             "student_action": student,
             "feedback_strategy": _feedback(profile),
-            "completion_criteria": "Người học hoàn thành nhiệm vụ và thể hiện được ý chính trước khi chuyển màn hình.",
+            "learning_evidence": _learning_evidence(profile),
+            "completion_criteria": "Người học tạo được sản phẩm/đầu ra học tập theo yêu cầu và dùng ít nhất một chi tiết từ học liệu để giải thích.",
             "accessibility_alt": f"Minh họa học tập cho nội dung: {title}.",
-            "transition": "Chốt ý chính → kết nối với màn hình kế tiếp.",
+            "transition": "Nhận phản hồi → chốt ý → kết nối với nhiệm vụ kế tiếp.",
+            "screen_sequence": "Gợi mở → học liệu → hành động của học sinh → phản hồi → chốt kiến thức.",
             "source_safe": True,
             "content_depth": "rich" if len(bullets) >= 3 else "needs-review",
             "scored_interaction": interaction is not None,
