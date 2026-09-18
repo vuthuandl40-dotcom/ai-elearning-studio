@@ -26,3 +26,20 @@ const lessonPath = path.join(root, "frontend/components/editor/LessonEditor.tsx"
 let lesson = fs.readFileSync(lessonPath, "utf8");
 lesson = lesson.replace('flex h-screen min-h-0 flex-col overflow-hidden bg-white', 'flex h-screen min-h-0 flex-col overflow-hidden bg-[#f6f8fe]');
 fs.writeFileSync(lessonPath, lesson);
+
+for (const rel of [
+  "frontend/app/classrooms/page.tsx",
+  "frontend/app/classrooms/[classroomId]/page.tsx",
+  "frontend/app/learn/page.tsx",
+  "frontend/components/analytics/AnalyticsDashboard.tsx",
+]) {
+  const p = path.join(root, rel);
+  let x = fs.readFileSync(p, "utf8");
+  x = x.replaceAll("bg-slate-50", "bg-[#f6f8fe]");
+  x = x.replaceAll("violet-", "indigo-");
+  x = x.replaceAll("shadow-sm", "shadow-sm shadow-indigo-100/30");
+  x = x.replace("Classroom Portal", "AI E-Learning Studio · Lớp học");
+  x = x.replace("Student Portal", "AI E-Learning Studio · Học sinh");
+  x = x.replace("Analytics · ", "Báo cáo & Analytics · ");
+  fs.writeFileSync(p, x);
+}
