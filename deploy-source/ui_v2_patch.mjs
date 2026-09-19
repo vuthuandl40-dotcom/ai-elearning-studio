@@ -280,3 +280,48 @@ if(!deleteDashboard.includes('const [deleting, setDeleting]')){
   );
 }
 fs.writeFileSync(deleteDashboardPath,deleteDashboard);
+
+
+const rerunLibraryPath=path.join(root,"frontend/app/library/page.tsx");
+let rerunLibrary=fs.readFileSync(rerunLibraryPath,"utf8");
+if(!rerunLibrary.includes('const [rerunning,setRerunning]')){
+  rerunLibrary=rerunLibrary.replace(
+    '  const [deleting,setDeleting]=useState("");',
+    '  const [deleting,setDeleting]=useState("");\n  const [rerunning,setRerunning]=useState("");\n  const [notice,setNotice]=useState("");'
+  );
+  rerunLibrary=rerunLibrary.replace(
+    '  async function removeProject(p:Project)',
+    '  async function rebuildFromSource(p:Project){ if(!window.confirm(`Tạo lại toàn bộ bài “${p.title}” từ giáo án gốc?\\n\\nHệ thống sẽ chạy lại Phân tích → Kế hoạch → Sinh bài bằng pipeline mới. Nội dung sinh cũ có thể bị thay thế.`))return; setRerunning(p.id); setError(""); setNotice(""); try{ const aj=await api.createJob(p.id,"analyze",{use_ai:true,create_embeddings:true,vision_fallback:true,force:true}); await api.waitForJob(aj.id); const pj=await api.createJob(p.id,"plan",{use_ai:true,preserve_teacher_edits:false,force:true}); await api.waitForJob(pj.id); const plan=await api.latestPlan(p.id); await api.approvePlan(p.id,plan.id); const gj=await api.createJob(p.id,"generate",{use_ai:true,preserve_teacher_edits:false,fallback_to_local:true,force:true}); await api.waitForJob(gj.id); setNotice(`Đã tạo lại “${p.title}” từ giáo án gốc bằng pipeline mới.`); const refreshed=await api.listProjects(); setProjects(refreshed);}catch(e){setError(e instanceof Error?e.message:"Không thể tạo lại bài từ nguồn");}finally{setRerunning("");} }\n\n  async function removeProject(p:Project)'
+  );
+  rerunLibrary=rerunLibrary.replace(
+    '{error&&<div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">{error}</div>}',
+    '{error&&<div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">{error}</div>}{notice&&<div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-700">{notice}</div>}'
+  );
+  rerunLibrary=rerunLibrary.replaceAll(
+    '<button disabled={deleting===p.id} onClick={()=>removeProject(p)} className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[9px] font-black text-rose-700 disabled:opacity-40">{deleting===p.id?"Đang xóa…":"Xóa"}</button>',
+    '<button disabled={!!rerunning||!!deleting} onClick={()=>rebuildFromSource(p)} className="rounded-lg border border-indigo-200 bg-indigo-50 px-2 py-1 text-[9px] font-black text-indigo-700 disabled:opacity-40">{rerunning===p.id?"Đang tạo lại…":"Tạo lại từ nguồn"}</button><button disabled={deleting===p.id||rerunning===p.id} onClick={()=>removeProject(p)} className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[9px] font-black text-rose-700 disabled:opacity-40">{deleting===p.id?"Đang xóa…":"Xóa"}</button>'
+  );
+  rerunLibrary=rerunLibrary.replaceAll(
+    '<button disabled={deleting===p.id} onClick={()=>removeProject(p)} className="mr-2 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[10px] font-black text-rose-700 disabled:opacity-40">{deleting===p.id?"Đang xóa…":"Xóa"}</button>',
+    '<button disabled={!!rerunning||!!deleting} onClick={()=>rebuildFromSource(p)} className="mr-2 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-[10px] font-black text-indigo-700 disabled:opacity-40">{rerunning===p.id?"Đang tạo lại…":"Tạo lại từ nguồn"}</button><button disabled={deleting===p.id||rerunning===p.id} onClick={()=>removeProject(p)} className="mr-2 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[10px] font-black text-rose-700 disabled:opacity-40">{deleting===p.id?"Đang xóa…":"Xóa"}</button>'
+  );
+}
+fs.writeFileSync(rerunLibraryPath,rerunLibrary);
+
+const rerunDashboardPath=path.join(root,"frontend/app/page.tsx");
+let rerunDashboard=fs.readFileSync(rerunDashboardPath,"utf8");
+if(!rerunDashboard.includes('const [rerunning, setRerunning]')){
+  rerunDashboard=rerunDashboard.replace(
+    '  const [deleting, setDeleting] = useState("");',
+    '  const [deleting, setDeleting] = useState("");\n  const [rerunning, setRerunning] = useState("");'
+  );
+  rerunDashboard=rerunDashboard.replace(
+    '  async function removeProject(p: Project)',
+    '  async function rebuildFromSource(p: Project) { if (!window.confirm(`Tạo lại toàn bộ bài “${p.title}” từ giáo án gốc?\\n\\nPipeline mới sẽ phân tích lại toàn bộ nguồn và thay nội dung sinh cũ.`)) return; setRerunning(p.id); setError(""); try { const aj=await api.createJob(p.id,"analyze",{use_ai:true,create_embeddings:true,vision_fallback:true,force:true}); await api.waitForJob(aj.id); const pj=await api.createJob(p.id,"plan",{use_ai:true,preserve_teacher_edits:false,force:true}); await api.waitForJob(pj.id); const plan=await api.latestPlan(p.id); await api.approvePlan(p.id,plan.id); const gj=await api.createJob(p.id,"generate",{use_ai:true,preserve_teacher_edits:false,fallback_to_local:true,force:true}); await api.waitForJob(gj.id); setProjects(await api.listProjects()); } catch(e) { setError(e instanceof Error ? e.message : "Không thể tạo lại bài từ nguồn"); } finally { setRerunning(""); } }\n\n  async function removeProject(p: Project)'
+  );
+  rerunDashboard=rerunDashboard.replace(
+    '<button disabled={deleting===p.id} onClick={(e)=>{e.stopPropagation();removeProject(p)}} className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[9px] font-black text-rose-700 disabled:opacity-40">{deleting===p.id?"Đang xóa…":"Xóa"}</button>',
+    '<button disabled={!!rerunning||!!deleting} onClick={(e)=>{e.stopPropagation();rebuildFromSource(p)}} className="rounded-lg border border-indigo-200 bg-indigo-50 px-2 py-1 text-[9px] font-black text-indigo-700 disabled:opacity-40">{rerunning===p.id?"Đang tạo lại…":"Tạo lại"}</button><button disabled={deleting===p.id||rerunning===p.id} onClick={(e)=>{e.stopPropagation();removeProject(p)}} className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[9px] font-black text-rose-700 disabled:opacity-40">{deleting===p.id?"Đang xóa…":"Xóa"}</button>'
+  );
+}
+fs.writeFileSync(rerunDashboardPath,rerunDashboard);
