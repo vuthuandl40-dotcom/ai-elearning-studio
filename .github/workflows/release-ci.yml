@@ -39,19 +39,16 @@ jobs:
           mkdir src
           tar -xJf source.tar.xz -C src
           patch -d src -p1 < deploy-source/patches/0001-lesson-editor-null-project.patch
-      - name: Inspect AI grounding prompts
-        working-directory: src
-        run: |
-          sed -n '1,220p' app/services/source_analyzer/service.py
-          sed -n '1,220p' app/services/source_analyzer/openai_client.py
-          sed -n '1,220p' app/services/pedagogy_planner/openai_client.py
-          sed -n '1,220p' app/services/lesson_writer/openai_client.py
+          python deploy-source/content_grounding_patch.py src
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Install backend dependencies
         working-directory: src
         run: pip install -r requirements.txt
+      - name: Source grounding regression
+        working-directory: src
+        run: python ../deploy-source/test_content_grounding.py
       - name: Enable pgvector extension
         run: psql -h localhost -U elearning -d elearning -c 'CREATE EXTENSION IF NOT EXISTS vector;'
       - name: Migrate database
