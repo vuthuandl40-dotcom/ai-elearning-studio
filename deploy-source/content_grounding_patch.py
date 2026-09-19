@@ -516,3 +516,231 @@ s=s.replace(old,new)
 p.write_text(s)
 
 print("generation-source-coverage-report-ok")
+
+
+# 13) Centralize project authorization across authoring child routes.
+access_path=root/"app/core/project_access.py"
+access_path.write_text("""from __future__ import annotations
+
+from uuid import UUID
+
+from fastapi import HTTPException
+from sqlalchemy.orm import Session
+
+from app.core.authorization import organization_membership
+from app.db.models import (
+    AppUser,
+    BackgroundJob,
+    ExportRun,
+    LessonObjective,
+    LessonSection,
+    MediaAsset,
+    Project,
+    Slide,
+    SourceChunk,
+)
+
+
+def require_project_access(
+    db: Session,
+    project_id: UUID,
+    user: AppUser,
+    *,
+    write: bool = False,
+) -> Project:
+    project = db.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if user.role == "admin" or project.user_id == user.id:
+        return project
+    if project.organization_id:
+        membership = organization_membership(db, project.organization_id, user.id)
+        if (
+            membership
+            and membership.status == "active"
+            and membership.role in {"owner", "admin", "teacher"}
+        ):
+            return project
+    raise HTTPException(status_code=403, detail="Project access denied")
+
+
+def _entity_access(db: Session, model, entity_id: UUID, user: AppUser, *, write: bool, detail: str):
+    row = db.get(model, entity_id)
+    if not row:
+        raise HTTPException(status_code=404, detail=detail)
+    require_project_access(db, row.project_id, user, write=write)
+    return row
+
+
+def require_section_access(db: Session, section_id: UUID, user: AppUser, *, write: bool = False):
+    return _entity_access(db, LessonSection, section_id, user, write=write, detail="Section not found")
+
+
+def require_slide_access(db: Session, slide_id: UUID, user: AppUser, *, write: bool = False):
+    return _entity_access(db, Slide, slide_id, user, write=write, detail="Slide not found")
+
+
+def require_objective_access(db: Session, objective_id: UUID, user: AppUser, *, write: bool = False):
+    return _entity_access(db, LessonObjective, objective_id, user, write=write, detail="Objective not found")
+
+
+def require_chunk_access(db: Session, chunk_id: UUID, user: AppUser, *, write: bool = False):
+    return _entity_access(db, SourceChunk, chunk_id, user, write=write, detail="Source chunk not found")
+
+
+def require_job_access(db: Session, job_id: UUID, user: AppUser, *, write: bool = False):
+    return _entity_access(db, BackgroundJob, job_id, user, write=write, detail="Job not found")
+
+
+def require_export_access(db: Session, export_id: UUID, user: AppUser, *, write: bool = False):
+    return _entity_access(db, ExportRun, export_id, user, write=write, detail="Export not found")
+
+
+def require_media_access(db: Session, asset_id: UUID, user: AppUser, *, write: bool = False):
+    return _entity_access(db, MediaAsset, asset_id, user, write=write, detail="Media asset not found")
+""")
+
+import ast as _ast
+import re as _re
+
+def _ensure_import_line(source: str, line: str) -> str:
+    if line in source:
+        return source
+    future = _re.match(r"^(from __future__ import [^\n]+\n+)", source)
+    pos = future.end() if future else 0
+    return source[:pos] + line + "\n" + source[pos:]
+
+
+def _route_specs(source: str):
+    tree = _ast.parse(source)
+    specs = []
+    for node in tree.body:
+        if not isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
+            continue
+        for deco in node.decorator_list:
+            if not isinstance(deco, _ast.Call) or not isinstance(deco.func, _ast.Attribute):
+                continue
+            method = deco.func.attr.lower()
+            if method not in {"get", "post", "put", "patch", "delete"} or not deco.args:
+                continue
+            first = deco.args[0]
+            if isinstance(first, _ast.Constant) and isinstance(first.value, str):
+                specs.append((node.name, method, first.value))
+                break
+    return specs
+
+
+def _add_user_and_guard(source: str, func_name: str, guard: str) -> str:
+    match = _re.search(rf"(?m)^(?P<indent>[ \t]*)(?:async[ \t]+)?def[ \t]+{_re.escape(func_name)}[ \t]*\(", source)
+    if not match:
+        return source
+    start = match.start()
+    open_pos = source.find("(", match.start(), match.end() + 2)
+    depth = 0
+    close_pos = None
+    for idx in range(open_pos, len(source)):
+        ch = source[idx]
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                close_pos = idx
+                break
+    if close_pos is None:
+        raise RuntimeError(f"Cannot locate signature end for {func_name}")
+
+    signature = source[start:close_pos + 1]
+    if "user: AppUser = Depends(get_current_user)" not in signature:
+        before = source[:close_pos].rstrip()
+        separator = "" if before.endswith("(") else ", "
+        source = source[:close_pos] + separator + "user: AppUser = Depends(get_current_user)" + source[close_pos:]
+        close_pos += len(separator) + len("user: AppUser = Depends(get_current_user)")
+
+    # Re-locate the function after signature mutation and insert the guard as the first body statement.
+    match = _re.search(rf"(?m)^(?P<indent>[ \t]*)(?:async[ \t]+)?def[ \t]+{_re.escape(func_name)}[ \t]*\(", source)
+    open_pos = source.find("(", match.start(), match.end() + 2)
+    depth = 0
+    close_pos = None
+    for idx in range(open_pos, len(source)):
+        if source[idx] == "(":
+            depth += 1
+        elif source[idx] == ")":
+            depth -= 1
+            if depth == 0:
+                close_pos = idx
+                break
+    colon_pos = source.find(":", close_pos)
+    newline_pos = source.find("\n", colon_pos)
+    if newline_pos < 0:
+        raise RuntimeError(f"Cannot locate body for {func_name}")
+    body_indent = match.group("indent") + "    "
+    guard_line = body_indent + guard
+    body_preview = source[newline_pos + 1:newline_pos + 1 + len(guard_line) + 4]
+    if guard not in body_preview:
+        source = source[:newline_pos + 1] + guard_line + "\n" + source[newline_pos + 1:]
+    return source
+
+
+def _secure_authoring_routes(rel_path: str) -> None:
+    p = root / rel_path
+    source = p.read_text()
+    helpers = {
+        "project_id": "require_project_access",
+        "section_id": "require_section_access",
+        "slide_id": "require_slide_access",
+        "objective_id": "require_objective_access",
+        "chunk_id": "require_chunk_access",
+        "job_id": "require_job_access",
+        "export_id": "require_export_access",
+        "asset_id": "require_media_access",
+    }
+    specs = _route_specs(source)
+    used_helpers = set()
+    patches = []
+    for func_name, method, route_path in specs:
+        helper = var_name = None
+        # Prefer the most specific entity id over project_id when both ever coexist.
+        for candidate in ("section_id", "slide_id", "objective_id", "chunk_id", "job_id", "export_id", "asset_id", "project_id"):
+            if "{" + candidate + "}" in route_path:
+                var_name = candidate
+                helper = helpers[candidate]
+                break
+        if not helper:
+            continue
+        write = method in {"post", "put", "patch", "delete"}
+        if helper == "require_project_access":
+            guard = f"{helper}(db, {var_name}, user, write={write})"
+        else:
+            guard = f"{helper}(db, {var_name}, user, write={write})"
+        patches.append((func_name, guard))
+        used_helpers.add(helper)
+
+    if not patches:
+        return
+    source = _ensure_import_line(source, "from app.core.security import get_current_user")
+    source = _ensure_import_line(source, "from app.db.models import AppUser")
+    source = _ensure_import_line(
+        source,
+        "from app.core.project_access import " + ", ".join(sorted(used_helpers)),
+    )
+    for func_name, guard in patches:
+        source = _add_user_and_guard(source, func_name, guard)
+    p.write_text(source)
+
+
+for _rel in [
+    "app/api/routes/analysis.py",
+    "app/api/routes/planning.py",
+    "app/api/routes/generation.py",
+    "app/api/routes/sections.py",
+    "app/api/routes/slides.py",
+    "app/api/routes/sources.py",
+    "app/api/routes/jobs.py",
+    "app/api/routes/interactions.py",
+    "app/api/routes/copilot.py",
+    "app/api/routes/exports.py",
+]:
+    _secure_authoring_routes(_rel)
+
+print("project-child-route-security-patch-ok")
