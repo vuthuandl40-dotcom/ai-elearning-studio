@@ -95,6 +95,12 @@ jobs:
           done
           test -s /tmp/login.html
           grep -q "AI E-Learning" /tmp/login.html
+          curl -fsS http://127.0.0.1:3000/library >/tmp/library.html
+          curl -fsS http://127.0.0.1:3000/students >/tmp/students.html
+          curl -fsS http://127.0.0.1:3000/reports >/tmp/reports.html
+          test -s /tmp/library.html
+          test -s /tmp/students.html
+          test -s /tmp/reports.html
       - name: Runtime logs on failure
         if: failure()
         run: |
