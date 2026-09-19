@@ -424,3 +424,34 @@ s=s.replace(old,new)
 p.write_text(s)
 
 print("writer-source-coverage-gate-ok")
+
+
+# 11) Preserve deterministic source order during planning and always expose coverage status.
+p=root/"app/services/pedagogy_planner/service.py"
+s=p.read_text()
+s=s.replace(
+    'chunks = list(db.scalars(select(SourceChunk).where(SourceChunk.project_id == project_id)))',
+    'chunks = list(db.scalars(select(SourceChunk).where(SourceChunk.project_id == project_id).order_by(SourceChunk.source_file_id, SourceChunk.chunk_index)))'
+)
+old='''    if before_pct < 95:
+        plan.warnings.append(
+            f"Độ phủ nguồn của Planner được tự sửa từ {before_pct}% lên {after_pct}% "
+            f"({len(ordered_ids)} source chunks)."
+        )
+    return plan
+'''
+new='''    if before_pct < 95:
+        plan.warnings.append(
+            f"Độ phủ nguồn của Planner được tự sửa từ {before_pct}% lên {after_pct}% "
+            f"({len(ordered_ids)} source chunks)."
+        )
+    plan.warnings.append(
+        f"Độ phủ nguồn sau kiểm tra: {after_pct}% ({len(ordered_ids)} source chunks đã được phân bổ vào kế hoạch)."
+    )
+    return plan
+'''
+if old in s:
+    s=s.replace(old,new)
+p.write_text(s)
+
+print("planner-source-order-and-coverage-status-ok")
