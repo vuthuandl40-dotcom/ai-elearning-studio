@@ -1,0 +1,35 @@
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from types import SimpleNamespace
+
+from docx import Document
+
+from app.services.source_analyzer.parsers import parse_docx
+from app.services.source_analyzer.knowledge_map import build_local_knowledge_map
+
+
+with TemporaryDirectory() as td:
+    path=Path(td)/"lesson.docx"
+    doc=Document()
+    doc.add_heading("BÀI HỌC", level=1)
+    doc.add_paragraph("Mở đầu của giáo án")
+    table=doc.add_table(rows=2, cols=2)
+    table.cell(0,0).text="Hoạt động của cô"
+    table.cell(0,1).text="Hoạt động của trẻ"
+    table.cell(1,0).text="Cô tổ chức quan sát và đặt câu hỏi"
+    table.cell(1,1).text="Trẻ quan sát, trả lời và nêu nhận xét"
+    doc.add_paragraph("Kết luận sau hoạt động")
+    doc.save(path)
+    parsed=parse_docx(path)
+    kinds=[u.metadata.get("kind") for u in parsed.units]
+    assert kinds==["paragraph","paragraph","table","paragraph"], kinds
+    assert parsed.metadata.get("preserved_document_order") is True
+
+chunks=[]
+for i in range(20):
+    chunks.append(SimpleNamespace(id=f"c{i}", heading=f"Mục {i}", content=("Nội dung giáo án quan trọng "+str(i)+" ")*40))
+km=build_local_knowledge_map("Bài kiểm thử", chunks)
+assert len(km.topics)==20, len(km.topics)
+assert all(t.source_chunk_ids for t in km.topics)
+assert max(len(f.text) for t in km.topics for f in t.key_facts)>280
+print("source-grounding-regression-ok")
