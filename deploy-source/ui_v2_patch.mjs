@@ -344,3 +344,30 @@ if(!sourceQuality.includes("const sourceQualityInfo = useMemo")){
   );
 }
 fs.writeFileSync(sourceQualityPath,sourceQuality);
+
+
+const sourcePreviewPath=path.join(root,"frontend/app/projects/new/page.tsx");
+let sourcePreview=fs.readFileSync(sourcePreviewPath,"utf8");
+if(!sourcePreview.includes("const [analysis,setAnalysis]")){
+  sourcePreview=sourcePreview.replace(
+    'import type { BackgroundJob, Organization, PlanningRun, Project } from "@/lib/types";',
+    'import type { AnalysisRun, BackgroundJob, Organization, PlanningRun, Project } from "@/lib/types";'
+  );
+  sourcePreview=sourcePreview.replace(
+    '  const [plan, setPlan] = useState<PlanningRun | null>(null);',
+    '  const [plan, setPlan] = useState<PlanningRun | null>(null);\n  const [analysis,setAnalysis] = useState<AnalysisRun | null>(null);'
+  );
+  sourcePreview=sourcePreview.replace(
+    '  const sourceQualityInfo = useMemo(() =>',
+    '  const knowledgeTopics = useMemo(() => { const km=(analysis?.knowledge_map||{}) as Record<string,unknown>; return Array.isArray(km.topics)?km.topics as Array<Record<string,unknown>>:[]; }, [analysis]);\n  const sourceQualityInfo = useMemo(() =>'
+  );
+  sourcePreview=sourcePreview.replace(
+    '      await api.waitForJob(job.id, watch("AI đang đọc và phân tích tài liệu"));\n      setStage("plan");',
+    '      await api.waitForJob(job.id, watch("AI đang đọc và phân tích tài liệu"));\n      setAnalysis(await api.latestAnalysis(project.id));\n      setStage("plan");'
+  );
+  sourcePreview=sourcePreview.replace(
+    '<div className="mt-6 grid gap-5 lg:grid-cols-[.75fr_1.25fr]">',
+    '<details className="mt-5 overflow-hidden rounded-2xl border border-indigo-100 bg-indigo-50/40" open><summary className="cursor-pointer list-none px-4 py-3 text-sm font-black text-indigo-800">▣ Nội dung AI đã đọc từ giáo án <span className="ml-2 text-[10px] font-bold text-indigo-500">({knowledgeTopics.length} nhóm nội dung)</span></summary><div className="max-h-72 overflow-y-auto border-t border-indigo-100 bg-white p-3"><div className="grid gap-2 md:grid-cols-2">{knowledgeTopics.slice(0,40).map((topic,i)=>{const facts=Array.isArray(topic.key_facts)?topic.key_facts as Array<Record<string,unknown>>:[];return <div key={i} className="rounded-xl border border-slate-100 p-3"><div className="text-xs font-black text-slate-800">{i+1}. {String(topic.title||"Nội dung")}</div>{topic.summary?<div className="mt-1 line-clamp-3 text-[11px] leading-4 text-slate-500">{String(topic.summary)}</div>:null}{facts.length?<div className="mt-2 text-[10px] text-indigo-600">{facts.length} ý nguồn được giữ</div>:null}</div>})}</div>{!knowledgeTopics.length?<div className="p-4 text-center text-xs text-amber-700">Chưa đọc được nhóm nội dung từ tài liệu. Không nên sinh bài cho tới khi nguồn được phân tích đầy đủ.</div>:null}</div></details><div className="mt-6 grid gap-5 lg:grid-cols-[.75fr_1.25fr]">'
+  );
+}
+fs.writeFileSync(sourcePreviewPath,sourcePreview);
