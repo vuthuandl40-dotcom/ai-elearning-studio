@@ -40,6 +40,15 @@ jobs:
           tar -xJf source.tar.xz -C src
           patch -d src -p1 < deploy-source/patches/0001-lesson-editor-null-project.patch
           python deploy-source/content_grounding_patch.py src
+      - name: Inspect writer coverage integration
+        working-directory: src
+        run: |
+          echo "WRITER_SERVICE_BEGIN"
+          sed -n '1,420p' app/services/lesson_writer/service.py
+          echo "WRITER_SERVICE_END"
+          echo "WRITER_VALIDATOR_BEGIN"
+          sed -n '1,320p' app/services/lesson_writer/validator.py
+          echo "WRITER_VALIDATOR_END"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
