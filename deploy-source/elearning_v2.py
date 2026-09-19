@@ -297,6 +297,31 @@ def _fallback_interaction(
         )
 
     if section_key == "practice" and len(pool) >= 2:
+        pairs: list[tuple[str, str]] = []
+        for statement_item in pool[:4]:
+            words = statement_item.split()
+            if len(words) < 8:
+                continue
+            cut = max(3, min(len(words) - 3, len(words) // 2))
+            left = " ".join(words[:cut]).rstrip(" ,;:") + "…"
+            right = "… " + " ".join(words[cut:]).lstrip(" ,;:")
+            if left and right and all(left != old_left and right != old_right for old_left, old_right in pairs):
+                pairs.append((left, right))
+        if len(pairs) >= 2:
+            mapping = {left: right for left, right in pairs}
+            return InteractionBlueprint(
+                interaction_type="matching",
+                question=f"Ghép hai vế để khôi phục các ý đúng từ học liệu về “{title}”.",
+                options=[{"left": left, "right": right} for left, right in pairs],
+                correct_answer=mapping,
+                correct_feedback="Chính xác. Em đã ghép đúng các ý theo nội dung học liệu.",
+                incorrect_feedback="Chưa chính xác. Hãy đối chiếu ý nghĩa giữa hai vế và thử ghép lại.",
+                explanation="Các cặp đều được tách trực tiếp từ các ý xuất hiện trong nội dung bài học.",
+                difficulty="apply",
+                points=1.0,
+                settings={**base_settings, "hint": "Đọc trọn ý trong học liệu rồi ghép phần mở đầu với phần kết thúc phù hợp."},
+                source_chunk_ids=ids[:2],
+            )
         options = pool[:4]
         return InteractionBlueprint(
             interaction_type="multiple_choice",
