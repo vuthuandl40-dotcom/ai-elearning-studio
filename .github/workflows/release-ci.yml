@@ -55,15 +55,6 @@ jobs:
         run: |
           python -m compileall -q app alembic
           python -c 'import app.main; print("backend-import-ok")'
-      - name: V2 advanced-interaction probe
-        working-directory: src
-        run: |
-          echo "LEARNER_PY_BEGIN"
-          sed -n '1,125p' app/api/routes/learner.py
-          echo "LEARNER_PY_END"
-          echo "WRITER_FILES_BEGIN"
-          find app/services/lesson_writer -maxdepth 2 -type f | sort
-          echo "WRITER_FILES_END"
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
