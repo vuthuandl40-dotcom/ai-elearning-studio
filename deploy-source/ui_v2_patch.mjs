@@ -431,3 +431,29 @@ if(!finalQualityPage.includes("const [finalQuality,setFinalQuality]")){
   );
 }
 fs.writeFileSync(finalQualityPagePath,finalQualityPage);
+
+
+const editorQualityPath=path.join(root,"frontend/components/editor/TopBar.tsx");
+let editorQuality=fs.readFileSync(editorQualityPath,"utf8");
+if(!editorQuality.includes("const [sourceCoverage,setSourceCoverage]")){
+  editorQuality=editorQuality.replace('import { useState } from "react";','import { useEffect, useState } from "react";\nimport { api } from "@/lib/api";');
+  editorQuality=editorQuality.replace(
+    '  const [open, setOpen] = useState(false);',
+    '  const [open, setOpen] = useState(false);\n  const [sourceCoverage,setSourceCoverage]=useState<number|null>(null);\n  useEffect(()=>{let alive=true; api.latestGeneration(project.id).then(g=>{const line=(g.warnings||[]).map(String).find(w=>w.includes("Độ phủ nguồn trong bài sinh"))||""; const m=line.match(/(\\d+)%/); if(alive)setSourceCoverage(m?Number(m[1]):null);}).catch(()=>{if(alive)setSourceCoverage(null);}); return()=>{alive=false};},[project.id]);'
+  );
+  editorQuality=editorQuality.replace(
+    '<div className="flex items-center gap-2"><div className="truncate text-sm font-black">{project.title}</div>{dirty&&<span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-black text-amber-700">Chưa lưu</span>}</div>',
+    '<div className="flex items-center gap-2"><div className="truncate text-sm font-black">{project.title}</div>{sourceCoverage!==null&&<span className={"shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black "+(sourceCoverage>=90?"bg-emerald-50 text-emerald-700":"bg-amber-50 text-amber-700")}>Nguồn {sourceCoverage}%</span>}{dirty&&<span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-black text-amber-700">Chưa lưu</span>}</div>'
+  );
+}
+fs.writeFileSync(editorQualityPath,editorQuality);
+
+const libraryQualityPath=path.join(root,"frontend/app/library/page.tsx");
+let libraryQuality=fs.readFileSync(libraryQualityPath,"utf8");
+if(!libraryQuality.includes("coverageText")){
+  libraryQuality=libraryQuality.replace(
+    'const gj=await api.createJob(p.id,"generate",{use_ai:true,preserve_teacher_edits:false,fallback_to_local:true,force:true}); await api.waitForJob(gj.id); setNotice(`Đã tạo lại “${p.title}” từ giáo án gốc bằng pipeline mới.`);',
+    'const gj=await api.createJob(p.id,"generate",{use_ai:true,preserve_teacher_edits:false,fallback_to_local:true,force:true}); await api.waitForJob(gj.id); const generated=await api.latestGeneration(p.id); const coverageLine=(generated.warnings||[]).map(String).find(w=>w.includes("Độ phủ nguồn trong bài sinh"))||""; const coverageMatch=coverageLine.match(/(\\d+)%/); const coverageText=coverageMatch?` · Độ phủ nguồn ${coverageMatch[1]}%`:""; setNotice(`Đã tạo lại “${p.title}” từ giáo án gốc bằng pipeline mới${coverageText}.`);'
+  );
+}
+fs.writeFileSync(libraryQualityPath,libraryQuality);
