@@ -55,6 +55,13 @@ jobs:
         run: |
           python -m compileall -q app alembic
           python -c 'import app.main; print("backend-import-ok")'
+      - name: V2 export API probe
+        working-directory: src
+        run: |
+          echo "=== LESSON EDITOR EXPORT ==="
+          grep -n -B 12 -A 45 -E 'onExport|export.*async|handleExport|createExport' frontend/components/editor/LessonEditor.tsx || true
+          echo "=== API EXPORT METHODS ==="
+          grep -n -B 8 -A 35 -E 'export|artifact|download' frontend/lib/api.ts | head -n 260 || true
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
