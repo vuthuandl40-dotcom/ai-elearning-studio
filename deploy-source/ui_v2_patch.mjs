@@ -204,3 +204,24 @@ for(const [rel,active] of [
   }
   fs.writeFileSync(p,x);
 }
+
+const libraryNavPath=path.join(root,"frontend/app/library/page.tsx");
+let libraryNav=fs.readFileSync(libraryNavPath,"utf8");
+if(!libraryNav.includes('components/shell/TeacherNav')) libraryNav=libraryNav.replace('import { useEffect, useMemo, useState } from "react";','import { useEffect, useMemo, useState } from "react";\nimport TeacherNav from "@/components/shell/TeacherNav";');
+libraryNav=libraryNav.replace(/<aside className="sticky top-\[68px\][\s\S]*?<\/aside>/,'<TeacherNav active="library"/>');
+fs.writeFileSync(libraryNavPath,libraryNav);
+
+const classroomNavPath=path.join(root,"frontend/app/classrooms/page.tsx");
+let classroomNav=fs.readFileSync(classroomNavPath,"utf8");
+if(!classroomNav.includes('components/shell/TeacherNav')) classroomNav=classroomNav.replace('"use client";','"use client";\n\nimport TeacherNav from "@/components/shell/TeacherNav";');
+if(!classroomNav.includes('<TeacherNav active="classrooms"/>')){
+  const mainOpen=classroomNav.indexOf('<main');
+  const headerEnd=classroomNav.indexOf('</header>',mainOpen);
+  if(headerEnd>=0){
+    const after=headerEnd+9;
+    classroomNav=classroomNav.slice(0,after)+'<div className="flex"><TeacherNav active="classrooms"/><div className="min-w-0 flex-1">'+classroomNav.slice(after);
+    const mainClose=classroomNav.lastIndexOf('</main>');
+    if(mainClose>=0) classroomNav=classroomNav.slice(0,mainClose)+'</div></div>'+classroomNav.slice(mainClose);
+  }
+}
+fs.writeFileSync(classroomNavPath,classroomNav);
