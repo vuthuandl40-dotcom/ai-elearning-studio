@@ -503,6 +503,11 @@ new='''        lesson_draft = validate_and_repair_draft(
             f"Độ phủ nguồn trong bài sinh: {round(final_coverage * 100)}% "
             f"({used_source_count}/{planned_source_count} source chunks thực sự được dùng)."
         )
+        if project.source_policy == "strict" and planned_source_count and final_coverage < 0.90:
+            raise DraftValidationError(
+                f"Bài sinh chỉ bao phủ {round(final_coverage * 100)}% nguồn trọng tâm "
+                f"({used_source_count}/{planned_source_count}); yêu cầu tối thiểu 90%."
+            )
         slide_count, ref_count = _persist_draft(
 '''
 if old not in s:
