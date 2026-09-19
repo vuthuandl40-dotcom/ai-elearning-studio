@@ -181,3 +181,26 @@ const dashMoreNavPath=path.join(root,"frontend/app/page.tsx");
 let dashMoreNav=fs.readFileSync(dashMoreNavPath,"utf8");
 dashMoreNav=dashMoreNav.replace('{ icon: "✧", label: "AI trợ lý", href: "/assistant" },','{ icon: "✧", label: "AI trợ lý", href: "/assistant" },\n  { icon: "◇", label: "Kho mẫu", href: "/templates" },\n  { icon: "⚙", label: "Cài đặt", href: "/settings" },');
 fs.writeFileSync(dashMoreNavPath,dashMoreNav);
+
+fs.mkdirSync(path.join(root,"frontend/components/shell"),{recursive:true});
+fs.writeFileSync(path.join(root,"frontend/components/shell/TeacherNav.tsx"),"\"use client\";\n\nconst items=[\n  [\"⌂\",\"Trang chủ\",\"/\",\"home\"],\n  [\"✦\",\"Tạo bài giảng\",\"/projects/new\",\"create\"],\n  [\"▣\",\"Thư viện\",\"/library\",\"library\"],\n  [\"♙\",\"Lớp học\",\"/classrooms\",\"classrooms\"],\n  [\"♟\",\"Học sinh\",\"/students\",\"students\"],\n  [\"▥\",\"Báo cáo\",\"/reports\",\"reports\"],\n  [\"✧\",\"AI trợ lý\",\"/assistant\",\"assistant\"],\n  [\"◇\",\"Kho mẫu\",\"/templates\",\"templates\"],\n  [\"⚙\",\"Cài đặt\",\"/settings\",\"settings\"],\n] as const;\n\nexport default function TeacherNav({active}:{active:string}){\n  return <aside className=\"sticky top-[68px] hidden h-[calc(100vh-68px)] w-[214px] shrink-0 border-r border-indigo-100 bg-white p-3 lg:block\">\n    <div className=\"px-3 pb-3 pt-2 text-[10px] font-black uppercase tracking-[.18em] text-slate-400\">Không gian làm việc</div>\n    <nav className=\"space-y-1\">{items.map(([icon,label,href,key])=><button key={key} onClick={()=>location.href=href} className={\"flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition \"+(active===key?\"bg-indigo-50 text-indigo-700\":\"text-slate-600 hover:bg-slate-50 hover:text-indigo-700\")}><span className=\"w-5 text-center text-base\">{icon}</span>{label}</button>)}</nav>\n    <div className=\"absolute bottom-4 left-3 right-3 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 p-4 text-white shadow-lg shadow-indigo-100\"><div className=\"text-xs font-black\">AI E-Learning Studio V2</div><div className=\"mt-1 text-[10px] leading-4 text-indigo-100\">Sinh bài · Biên tập · Giao bài · Theo dõi học tập</div></div>\n  </aside>;\n}\n");
+
+for(const [rel,active] of [
+  ["frontend/app/students/page.tsx","students"],
+  ["frontend/app/reports/page.tsx","reports"],
+  ["frontend/app/assistant/page.tsx","assistant"],
+  ["frontend/app/templates/page.tsx","templates"],
+  ["frontend/app/settings/page.tsx","settings"],
+]){
+  const p=path.join(root,rel);
+  let x=fs.readFileSync(p,"utf8");
+  if(!x.includes('components/shell/TeacherNav')) x=x.replace('import {', 'import TeacherNav from "@/components/shell/TeacherNav";\nimport {');
+  const needle='<div className="mx-auto max-w-';
+  const idx=x.indexOf(needle);
+  if(idx>=0){
+    x=x.slice(0,idx)+'<div className="flex"><TeacherNav active="'+active+'"/><div className="min-w-0 flex-1">'+x.slice(idx);
+    const end=x.lastIndexOf('</main>');
+    if(end>=0) x=x.slice(0,end)+'</div></div>'+x.slice(end);
+  }
+  fs.writeFileSync(p,x);
+}
