@@ -235,3 +235,88 @@ def delete_project(project_id: UUID, user: AppUser = Depends(get_current_user), 
 p.write_text(s)
 
 print("project-access-patch-ok")
+
+
+# 9) Enforce plan source coverage after AI/local validation.
+p=root/"app/services/pedagogy_planner/service.py"
+s=p.read_text()
+if "def _repair_plan_source_coverage(" not in s:
+    marker='''def plan_project(
+'''
+    helper='''def _repair_plan_source_coverage(plan: PedagogyPlan, chunks: list[SourceChunk]) -> PedagogyPlan:
+    """Guarantee that source chunks are not silently dropped before lesson writing."""
+    ordered_ids = [str(chunk.id) for chunk in chunks]
+    if not ordered_ids:
+        return plan
+
+    explore = [section for section in plan.sections if section.section_key in {"explore_1", "explore_2", "explore_3"}]
+    if not explore:
+        plan.warnings.append("Không thể tự sửa độ phủ nguồn vì thiếu các section Khám phá.")
+        return plan
+
+    used_before = {
+        chunk_id
+        for section in plan.sections
+        for chunk_id in section.source_chunk_ids
+        if chunk_id in set(ordered_ids)
+    }
+    before_pct = round(100 * len(used_before) / max(1, len(ordered_ids)))
+
+    heading_by_id = {
+        str(chunk.id): (getattr(chunk, "heading", None) or "").strip()
+        for chunk in chunks
+    }
+
+    count = len(ordered_ids)
+    for index, section in enumerate(explore[:3]):
+        start = (count * index) // 3
+        end = (count * (index + 1)) // 3
+        assigned = ordered_ids[start:end]
+        merged = list(dict.fromkeys([*section.source_chunk_ids, *assigned]))
+        section.source_chunk_ids = merged
+
+        headings = []
+        for chunk_id in assigned:
+            heading = heading_by_id.get(chunk_id, "")
+            if heading and heading not in headings:
+                headings.append(heading)
+        section.topic_titles = list(dict.fromkeys([*section.topic_titles, *headings]))[:12]
+
+        # Keep cognitive load manageable while allowing enough screens for the source.
+        source_screen_hint = max(1, (len(assigned) + 1) // 2)
+        section.slide_count_hint = min(12, max(section.slide_count_hint, source_screen_hint))
+
+    used_after = {
+        chunk_id
+        for section in plan.sections
+        for chunk_id in section.source_chunk_ids
+        if chunk_id in set(ordered_ids)
+    }
+    after_pct = round(100 * len(used_after) / max(1, len(ordered_ids)))
+    if after_pct < 100:
+        missing = [chunk_id for chunk_id in ordered_ids if chunk_id not in used_after]
+        target = explore[-1]
+        target.source_chunk_ids = list(dict.fromkeys([*target.source_chunk_ids, *missing]))
+        used_after.update(missing)
+        after_pct = 100
+
+    if before_pct < 95:
+        plan.warnings.append(
+            f"Độ phủ nguồn của Planner được tự sửa từ {before_pct}% lên {after_pct}% "
+            f"({len(ordered_ids)} source chunks)."
+        )
+    return plan
+
+
+'''
+    if marker not in s:
+        raise RuntimeError("planner service marker not found")
+    s=s.replace(marker,helper+marker)
+
+s=s.replace(
+    '        plan = validate_and_repair_plan(raw_plan, project, valid_chunk_ids)\n        _persist_plan(db, project, plan, preserve_teacher_edits)',
+    '        plan = validate_and_repair_plan(raw_plan, project, valid_chunk_ids)\n        plan = _repair_plan_source_coverage(plan, chunks)\n        _persist_plan(db, project, plan, preserve_teacher_edits)'
+)
+p.write_text(s)
+
+print("planner-source-coverage-patch-ok")
