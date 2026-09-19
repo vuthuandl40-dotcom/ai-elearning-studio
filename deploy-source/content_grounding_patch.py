@@ -320,3 +320,107 @@ s=s.replace(
 p.write_text(s)
 
 print("planner-source-coverage-patch-ok")
+
+
+# 10) Gate AI writer sections by source-reference coverage and fallback locally when sparse.
+p=root/"app/services/lesson_writer/service.py"
+s=p.read_text()
+if "def _section_ref_coverage(" not in s:
+    marker='''def _build_section(
+'''
+    helper='''def _section_ref_coverage(section: SectionDraft, section_plan: dict) -> float:
+    permitted = set(section_plan.get("source_chunk_ids") or [])
+    if not permitted:
+        return 1.0
+    used: set[str] = set()
+    for slide in section.slides:
+        used.update(
+            ref.source_chunk_id for ref in slide.source_refs
+            if ref.source_chunk_id in permitted
+        )
+        if slide.interaction:
+            used.update(
+                chunk_id for chunk_id in slide.interaction.source_chunk_ids
+                if chunk_id in permitted
+            )
+    return len(used) / max(1, len(permitted))
+
+
+'''
+    if marker not in s:
+        raise RuntimeError("lesson writer build-section marker not found")
+    s=s.replace(marker,helper+marker)
+
+old='''    rows = _section_chunks(section_plan, chunks_by_id)
+    if use_ai and writer is not None:
+        try:
+            return writer.build_section(
+                project=project,
+                section_plan=section_plan,
+                objectives=objectives,
+                chunks=rows,
+                teacher_profile=teacher_profile,
+            )
+        except Exception as exc:
+            if not fallback_to_local:
+                raise
+            local = build_local_section_draft(project, section_plan, chunks_by_id, objectives, teacher_profile)
+            local.warnings.append(f"AI Writer lỗi ở {section_plan['section_key']}; đã fallback local: {exc}")
+            return local
+    return build_local_section_draft(project, section_plan, chunks_by_id, objectives, teacher_profile)
+'''
+new='''    rows = _section_chunks(section_plan, chunks_by_id)
+    valid_chunk_ids = set(chunks_by_id)
+    key = section_plan.get("section_key")
+    if use_ai and writer is not None:
+        try:
+            candidate = writer.build_section(
+                project=project,
+                section_plan=section_plan,
+                objectives=objectives,
+                chunks=rows,
+                teacher_profile=teacher_profile,
+            )
+            candidate = validate_and_repair_section(
+                candidate,
+                plan_section=section_plan,
+                valid_chunk_ids=valid_chunk_ids,
+                source_policy=project.source_policy,
+            )
+            coverage = _section_ref_coverage(candidate, section_plan)
+            if key in {"explore_1", "explore_2", "explore_3"} and section_plan.get("source_chunk_ids") and coverage < 0.70:
+                raise DraftValidationError(
+                    f"{key}: AI Writer chỉ bao phủ {round(coverage * 100)}% nguồn được giao; yêu cầu tối thiểu 70%."
+                )
+            if key in {"explore_1", "explore_2", "explore_3"}:
+                candidate.warnings.append(f"{key}: source coverage {round(coverage * 100)}%.")
+            return candidate
+        except Exception as exc:
+            if not fallback_to_local:
+                raise
+            local = build_local_section_draft(project, section_plan, chunks_by_id, objectives, teacher_profile)
+            local = validate_and_repair_section(
+                local,
+                plan_section=section_plan,
+                valid_chunk_ids=valid_chunk_ids,
+                source_policy=project.source_policy,
+            )
+            local.warnings.append(
+                f"AI Writer không đạt yêu cầu ở {key}; đã fallback local source-grounded: {exc}"
+            )
+            return local
+
+    local = build_local_section_draft(project, section_plan, chunks_by_id, objectives, teacher_profile)
+    return validate_and_repair_section(
+        local,
+        plan_section=section_plan,
+        valid_chunk_ids=valid_chunk_ids,
+        source_policy=project.source_policy,
+    )
+'''
+if old not in s:
+    raise RuntimeError("lesson writer section builder body not found")
+s=s.replace(old,new)
+p.write_text(s)
+
+print("writer-source-coverage-gate-ok")
