@@ -40,6 +40,15 @@ jobs:
           tar -xJf source.tar.xz -C src
           patch -d src -p1 < deploy-source/patches/0001-lesson-editor-null-project.patch
           python deploy-source/content_grounding_patch.py src
+      - name: Inspect generation client
+        working-directory: src
+        run: |
+          echo "API_CLIENT_BEGIN"
+          sed -n '1,320p' frontend/lib/api.ts
+          echo "API_CLIENT_END"
+          echo "TYPES_BEGIN"
+          grep -n -A45 -B5 "Generation" frontend/lib/types.ts || true
+          echo "TYPES_END"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
