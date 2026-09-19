@@ -325,3 +325,22 @@ if(!rerunDashboard.includes('const [rerunning, setRerunning]')){
   );
 }
 fs.writeFileSync(rerunDashboardPath,rerunDashboard);
+
+
+const sourceQualityPath=path.join(root,"frontend/app/projects/new/page.tsx");
+let sourceQuality=fs.readFileSync(sourceQualityPath,"utf8");
+if(!sourceQuality.includes("const sourceQualityInfo = useMemo")){
+  sourceQuality=sourceQuality.replace(
+    '  const objectives = useMemo(() => Array.isArray(plan?.plan_json?.objectives) ? plan?.plan_json?.objectives as Array<Record<string,unknown>> : [], [plan]);',
+    '  const objectives = useMemo(() => Array.isArray(plan?.plan_json?.objectives) ? plan?.plan_json?.objectives as Array<Record<string,unknown>> : [], [plan]);\n  const sourceQualityInfo = useMemo(() => { const warnings=(plan?.warnings||[]).map(String); const line=warnings.find(w=>w.includes("Độ phủ nguồn sau kiểm tra")); const match=line?.match(/(\\d+)%.*?\\((\\d+) source chunks/); const coverage=match?Number(match[1]):null; const chunks=match?Number(match[2]):null; return {coverage,chunks,line}; }, [plan]);'
+  );
+  sourceQuality=sourceQuality.replace(
+    '<div className="mt-6 grid gap-5 lg:grid-cols-[.75fr_1.25fr]">',
+    '<div className="mt-5 grid gap-3 sm:grid-cols-4"><div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4"><div className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Độ phủ nguồn</div><div className="mt-1 text-2xl font-black text-emerald-800">{sourceQualityInfo.coverage!==null?sourceQualityInfo.coverage+"%":"Đang kiểm tra"}</div><div className="mt-1 text-[10px] text-emerald-700">Giáo án đã được phân bổ vào kế hoạch</div></div><div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[10px] font-black uppercase tracking-wider text-slate-400">Nguồn đã đọc</div><div className="mt-1 text-2xl font-black">{sourceQualityInfo.chunks??"—"}</div><div className="mt-1 text-[10px] text-slate-400">source chunks</div></div><div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[10px] font-black uppercase tracking-wider text-slate-400">Mục tiêu</div><div className="mt-1 text-2xl font-black">{objectives.length}</div><div className="mt-1 text-[10px] text-slate-400">yêu cầu cần đạt</div></div><div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[10px] font-black uppercase tracking-wider text-slate-400">Cấu trúc</div><div className="mt-1 text-2xl font-black">{sections.length}</div><div className="mt-1 text-[10px] text-slate-400">phần bài học</div></div></div><div className="mt-6 grid gap-5 lg:grid-cols-[.75fr_1.25fr]">'
+  );
+  sourceQuality=sourceQuality.replace(
+    '{plan?.warnings?.length?<div className="mt-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">{plan.warnings.join(" · ")}</div>:null}',
+    '{plan?.warnings?.filter(w=>!String(w).includes("Độ phủ nguồn sau kiểm tra")).length?<div className="mt-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">{plan.warnings.filter(w=>!String(w).includes("Độ phủ nguồn sau kiểm tra")).join(" · ")}</div>:null}'
+  );
+}
+fs.writeFileSync(sourceQualityPath,sourceQuality);
