@@ -388,9 +388,9 @@ new='''    rows = _section_chunks(section_plan, chunks_by_id)
                 source_policy=project.source_policy,
             )
             coverage = _section_ref_coverage(candidate, section_plan)
-            if key in {"explore_1", "explore_2", "explore_3"} and section_plan.get("source_chunk_ids") and coverage < 0.70:
+            if key in {"explore_1", "explore_2", "explore_3"} and section_plan.get("source_chunk_ids") and coverage < 0.90:
                 raise DraftValidationError(
-                    f"{key}: AI Writer chỉ bao phủ {round(coverage * 100)}% nguồn được giao; yêu cầu tối thiểu 70%."
+                    f"{key}: AI Writer chỉ bao phủ {round(coverage * 100)}% nguồn được giao; yêu cầu tối thiểu 90%."
                 )
             if key in {"explore_1", "explore_2", "explore_3"}:
                 candidate.warnings.append(f"{key}: source coverage {round(coverage * 100)}%.")
