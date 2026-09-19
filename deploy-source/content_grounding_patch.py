@@ -65,7 +65,7 @@ def parse_docx(path: Path) -> ParsedDocument:
             if rows:
                 units.append(
                     ParsedUnit(
-                        text="\n".join(rows),
+                        text="\\n".join(rows),
                         heading=current_heading,
                         metadata={
                             "kind": "table",
