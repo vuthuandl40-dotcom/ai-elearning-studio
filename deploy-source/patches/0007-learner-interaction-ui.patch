@@ -1,6 +1,6 @@
 --- a/frontend/app/learn/[assignmentId]/page.tsx
 +++ b/frontend/app/learn/[assignmentId]/page.tsx
-@@ -30,5 +30,42 @@
+@@ -30,5 +30,43 @@
  function Question({item,number,value,setValue,feedback,onSubmit,busy}:{item:LearnerInteraction;number:number;value:unknown;setValue:(v:unknown)=>void;feedback?:{correct:boolean;text?:string|null};onSubmit:()=>void;busy:boolean}){
 -  const isMulti=item.interaction_type==="multiple_choice"; const opts=item.options||[];
 -  function toggle(v:unknown){if(!isMulti){setValue(v);return}const arr=Array.isArray(value)?[...value]:[];const k=JSON.stringify(v);const idx=arr.findIndex(x=>JSON.stringify(x)===k);if(idx>=0)arr.splice(idx,1);else arr.push(v);setValue(arr)}
@@ -22,7 +22,7 @@
 +    const raw=String(o); const parts=raw.split(/\s*(?:→|=>|::|\|)\s*/,2);
 +    return [parts[0]||`Mục ${n+1}`,parts[1]||raw] as [string,string];
 +  }):[];
-+  const choices=Array.from(new Set(pairs.map(x=>x[1])));
++  const rawChoices=Array.from(new Set(pairs.map(x=>x[1])));\n+  const choices=rawChoices.length>1?[...rawChoices.slice(1),rawChoices[0]]:rawChoices;
 +  const mapping=(value&&typeof value==="object"&&!Array.isArray(value)?value:{}) as Record<string,string>;
 +  function toggle(v:unknown){
 +    if(!isMulti){setValue(v);return}
