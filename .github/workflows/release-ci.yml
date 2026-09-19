@@ -48,7 +48,7 @@ jobs:
         run: pip install -r requirements.txt
       - name: Source grounding regression
         working-directory: src
-        run: python ../deploy-source/test_content_grounding.py
+        run: PYTHONPATH=. python ../deploy-source/test_content_grounding.py
       - name: Enable pgvector extension
         run: psql -h localhost -U elearning -d elearning -c 'CREATE EXTENSION IF NOT EXISTS vector;'
       - name: Migrate database
