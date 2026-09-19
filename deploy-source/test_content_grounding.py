@@ -56,3 +56,18 @@ assert covered=={f"chunk-{i}" for i in range(9)}, covered
 assert all(section.slide_count_hint>=1 for section in plan.sections)
 assert any("Độ phủ nguồn" in w for w in plan.warnings)
 print("planner-source-coverage-regression-ok")
+
+
+from app.services.lesson_writer.service import _section_ref_coverage
+
+fake_section=SimpleNamespace(
+    slides=[
+        SimpleNamespace(
+            source_refs=[SimpleNamespace(source_chunk_id="a")],
+            interaction=None,
+        )
+    ]
+)
+coverage=_section_ref_coverage(fake_section,{"source_chunk_ids":["a","b","c","d"]})
+assert abs(coverage-0.25)<1e-9, coverage
+print("writer-source-coverage-regression-ok")
