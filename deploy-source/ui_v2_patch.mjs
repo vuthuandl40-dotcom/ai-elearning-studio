@@ -101,3 +101,27 @@ let dashNav=fs.readFileSync(dashNavPath,"utf8");
 dashNav=dashNav.replace('{ icon: "♟", label: "Học sinh", href: "/learn" }','{ icon: "♟", label: "Học sinh", href: "/students" }');
 dashNav=dashNav.replace('{ icon: "▥", label: "Báo cáo", href: "#analytics" }','{ icon: "▥", label: "Báo cáo", href: "/reports" }');
 fs.writeFileSync(dashNavPath,dashNav);
+
+const newProjectDirectPath=path.join(root,"frontend/app/projects/new/page.tsx");
+let newProjectDirect=fs.readFileSync(newProjectDirectPath,"utf8");
+newProjectDirect=newProjectDirect.replace(
+  'const [files, setFiles] = useState<File[]>([]);',
+  'const [files, setFiles] = useState<File[]>([]);\n  const [directText, setDirectText] = useState("");'
+);
+newProjectDirect=newProjectDirect.replace(
+  'if (!project || files.length === 0) return;',
+  'if (!project || (files.length === 0 && !directText.trim())) return;'
+);
+newProjectDirect=newProjectDirect.replace(
+  'for (const file of files) {',
+  'const sourceFiles = [...files];\n      if (directText.trim()) sourceFiles.push(new File([directText.trim()], "noi-dung-truc-tiep.txt", { type: "text/plain" }));\n      for (const file of sourceFiles) {'
+);
+newProjectDirect=newProjectDirect.replace(
+  'disabled={!project||!files.length||!!busy}',
+  'disabled={!project||(!files.length&&!directText.trim())||!!busy}'
+);
+newProjectDirect=newProjectDirect.replace(
+  '<div className="mt-4 flex flex-wrap gap-2">{["Tạo bài về biến đổi khí hậu","Bài học Python","Giáo án Toán","Song ngữ Anh - Việt"].map(x=><span key={x} className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-[10px] font-bold text-slate-500">{x}</span>)}</div>',
+  '<div className="my-4 flex items-center gap-3 text-[10px] font-black uppercase tracking-wider text-slate-300"><span className="h-px flex-1 bg-slate-200"/><span>hoặc nhập nội dung trực tiếp</span><span className="h-px flex-1 bg-slate-200"/></div><textarea disabled={!project} value={directText} onChange={e=>setDirectText(e.target.value)} rows={5} className="input resize-y text-xs leading-5" placeholder="Dán nội dung bài học, chủ đề, yêu cầu cần đạt hoặc nội dung muốn AI phân tích…"/><div className="mt-4 flex flex-wrap gap-2">{["Tạo bài về biến đổi khí hậu","Bài học Python","Giáo án Toán","Song ngữ Anh - Việt"].map(x=><button type="button" key={x} onClick={()=>setDirectText(x)} className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-[10px] font-bold text-slate-500 hover:bg-indigo-50 hover:text-indigo-700">{x}</button>)}</div>'
+);
+fs.writeFileSync(newProjectDirectPath,newProjectDirect);
