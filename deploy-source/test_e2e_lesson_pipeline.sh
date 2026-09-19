@@ -107,6 +107,18 @@ curl -fsS -c "$COOKIE" -b "$COOKIE" -X POST "$API/projects/$PROJECT_ID/plan/$PLA
 generate=$(curl -fsS -c "$COOKIE" -b "$COOKIE" -H 'Content-Type: application/json' -d '{"kind":"generate","payload":{"use_ai":false,"preserve_teacher_edits":false,"fallback_to_local":true},"max_attempts":1}' "$API/projects/$PROJECT_ID/jobs")
 wait_job "$(job_id "$generate")"
 
+curl -fsS -c "$COOKIE" -b "$COOKIE" "$API/projects/$PROJECT_ID/generation/latest" >/tmp/e2e-generation.json
+python - <<'PY'
+import json,re
+d=json.load(open("/tmp/e2e-generation.json"))
+warnings=[str(x) for x in d.get("warnings") or []]
+line=next((x for x in warnings if "Độ phủ nguồn trong bài sinh" in x), "")
+assert line, f"missing final source coverage warning: {warnings}"
+m=re.search(r"(\d+)%", line)
+assert m, line
+print("e2e-final-source-coverage", line)
+PY
+
 curl -fsS -c "$COOKIE" -b "$COOKIE" "$API/projects/$PROJECT_ID/slides" >/tmp/e2e-slides.json
 python - <<'PY'
 import json
