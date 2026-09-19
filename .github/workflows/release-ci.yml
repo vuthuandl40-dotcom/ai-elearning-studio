@@ -49,6 +49,15 @@ jobs:
           echo "PROJECT_ROUTES_BEGIN"
           grep -R -n -E '@router\.(get|post|patch|delete)|def .*project|project_id' app/api/routes | head -n 500
           echo "PROJECT_ROUTES_END"
+      - name: Inspect project auth imports
+        working-directory: src
+        run: |
+          echo "PROJECTS_IMPORTS_BEGIN"
+          sed -n '1,90p' app/api/routes/projects.py
+          echo "PROJECTS_IMPORTS_END"
+          echo "JOBS_BEGIN"
+          sed -n '1,90p' app/api/routes/jobs.py
+          echo "JOBS_END"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
