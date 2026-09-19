@@ -40,24 +40,6 @@ jobs:
           tar -xJf source.tar.xz -C src
           patch -d src -p1 < deploy-source/patches/0001-lesson-editor-null-project.patch
           python deploy-source/content_grounding_patch.py src
-      - name: Inspect project route authorization
-        working-directory: src
-        run: |
-          echo "ROUTE_FILES_BEGIN"
-          find app/api/routes -maxdepth 1 -type f -name '*.py' -print | sort
-          echo "ROUTE_FILES_END"
-          echo "PROJECT_ROUTES_BEGIN"
-          grep -R -n -E '@router\.(get|post|patch|delete)|def .*project|project_id' app/api/routes | head -n 500
-          echo "PROJECT_ROUTES_END"
-      - name: Inspect project auth imports
-        working-directory: src
-        run: |
-          echo "PROJECTS_IMPORTS_BEGIN"
-          sed -n '1,90p' app/api/routes/projects.py
-          echo "PROJECTS_IMPORTS_END"
-          echo "JOBS_BEGIN"
-          sed -n '1,90p' app/api/routes/jobs.py
-          echo "JOBS_END"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -109,6 +91,7 @@ jobs:
           cat /tmp/health.json
           curl -fsS http://127.0.0.1:8000/ready
           bash deploy-source/test_e2e_lesson_pipeline.sh
+          python deploy-source/test_project_access.py
       - name: Runtime smoke frontend container
         run: |
           docker run -d --name frontend-smoke --network host -e PORT=3000 ai-elearning-frontend:ci
