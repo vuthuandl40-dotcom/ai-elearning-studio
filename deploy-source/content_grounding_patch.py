@@ -653,7 +653,7 @@ def _add_user_and_guard(source: str, func_name: str, guard: str) -> str:
     signature = source[start:close_pos + 1]
     if "user: AppUser = Depends(get_current_user)" not in signature:
         before = source[:close_pos].rstrip()
-        separator = "" if before.endswith("(") else ", "
+        separator = "" if before.endswith(("(", ",")) else ", "
         source = source[:close_pos] + separator + "user: AppUser = Depends(get_current_user)" + source[close_pos:]
         close_pos += len(separator) + len("user: AppUser = Depends(get_current_user)")
 
