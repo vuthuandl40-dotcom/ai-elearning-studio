@@ -90,6 +90,7 @@ jobs:
           done
           cat /tmp/health.json
           curl -fsS http://127.0.0.1:8000/ready
+          bash deploy-source/test_e2e_lesson_pipeline.sh
       - name: Runtime smoke frontend container
         run: |
           docker run -d --name frontend-smoke --network host -e PORT=3000 ai-elearning-frontend:ci
