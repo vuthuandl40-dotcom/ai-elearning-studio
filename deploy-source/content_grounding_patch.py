@@ -172,3 +172,66 @@ s=s.replace(
 p.write_text(s)
 
 print("content-grounding-patch-ok")
+
+
+# 8) Secure project read/update/delete access.
+p=root/"app/api/routes/projects.py"
+s=p.read_text()
+if "def _require_project_permission(" not in s:
+    anchor='''def _project_or_404(project_id: UUID, db: Session) -> Project:
+    project = db.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
+'''
+    helper=anchor+'''
+
+def _require_project_permission(project: Project, user: AppUser, db: Session, *, write: bool = False) -> None:
+    if user.role == "admin" or project.user_id == user.id:
+        return
+    if project.organization_id:
+        membership = organization_membership(db, project.organization_id, user.id)
+        if membership and membership.status == "active" and membership.role in {"owner", "admin", "teacher"}:
+            return
+    raise HTTPException(status_code=403, detail="Project access denied")
+'''
+    if anchor not in s:
+        raise RuntimeError("projects.py project helper anchor not found")
+    s=s.replace(anchor,helper)
+
+s=s.replace(
+'''@router.get("/{project_id}", response_model=ProjectDetail)
+def get_project(project_id: UUID, db: Session = Depends(get_db)):
+    project = _project_or_404(project_id, db)
+''',
+'''@router.get("/{project_id}", response_model=ProjectDetail)
+def get_project(project_id: UUID, user: AppUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    project = _project_or_404(project_id, db)
+    _require_project_permission(project, user, db)
+'''
+)
+s=s.replace(
+'''@router.patch("/{project_id}", response_model=ProjectRead)
+def update_project(project_id: UUID, payload: ProjectUpdate, db: Session = Depends(get_db)):
+    project = _project_or_404(project_id, db)
+''',
+'''@router.patch("/{project_id}", response_model=ProjectRead)
+def update_project(project_id: UUID, payload: ProjectUpdate, user: AppUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    project = _project_or_404(project_id, db)
+    _require_project_permission(project, user, db, write=True)
+'''
+)
+s=s.replace(
+'''@router.delete("/{project_id}", response_model=Message)
+def delete_project(project_id: UUID, db: Session = Depends(get_db)):
+    project = _project_or_404(project_id, db)
+''',
+'''@router.delete("/{project_id}", response_model=Message)
+def delete_project(project_id: UUID, user: AppUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    project = _project_or_404(project_id, db)
+    _require_project_permission(project, user, db, write=True)
+'''
+)
+p.write_text(s)
+
+print("project-access-patch-ok")
