@@ -33,3 +33,26 @@ assert len(km.topics)==20, len(km.topics)
 assert all(t.source_chunk_ids for t in km.topics)
 assert max(len(f.text) for t in km.topics for f in t.key_facts)>280
 print("source-grounding-regression-ok")
+
+
+from app.services.pedagogy_planner.service import _repair_plan_source_coverage
+from app.services.pedagogy_planner.types import PedagogyPlan, PlannedSection
+
+plan=PedagogyPlan(
+    plan_title="Coverage test",
+    lesson_strategy="source first",
+    total_duration_seconds=1800,
+    objectives=[],
+    sections=[
+        PlannedSection(section_key="explore_1",section_order=4,title="Khám phá 1",purpose="p",planned_duration_seconds=300,slide_count_hint=1),
+        PlannedSection(section_key="explore_2",section_order=5,title="Khám phá 2",purpose="p",planned_duration_seconds=300,slide_count_hint=1),
+        PlannedSection(section_key="explore_3",section_order=6,title="Khám phá 3",purpose="p",planned_duration_seconds=300,slide_count_hint=1),
+    ],
+)
+fake_chunks=[SimpleNamespace(id=f"chunk-{i}",heading=f"Mục {i//2}") for i in range(9)]
+plan=_repair_plan_source_coverage(plan,fake_chunks)
+covered={cid for section in plan.sections for cid in section.source_chunk_ids}
+assert covered=={f"chunk-{i}" for i in range(9)}, covered
+assert all(section.slide_count_hint>=1 for section in plan.sections)
+assert any("Độ phủ nguồn" in w for w in plan.warnings)
+print("planner-source-coverage-regression-ok")
