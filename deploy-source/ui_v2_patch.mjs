@@ -402,3 +402,32 @@ for(const rel of ["frontend/app/library/page.tsx","frontend/app/page.tsx"]){
   }
   fs.writeFileSync(p,x);
 }
+
+
+const finalQualityApiPath=path.join(root,"frontend/lib/api.ts");
+let finalQualityApi=fs.readFileSync(finalQualityApiPath,"utf8");
+if(!finalQualityApi.includes("latestGeneration:")){
+  finalQualityApi=finalQualityApi.replace(
+    '  latestPlan: (projectId: string) => request<PlanningRun>(`/projects/${projectId}/plan/latest`),',
+    '  latestPlan: (projectId: string) => request<PlanningRun>(`/projects/${projectId}/plan/latest`),\n  latestGeneration: (projectId: string) => request<{ warnings?: string[]; slide_count?: number; source_ref_count?: number; generation_json?: unknown }>(`/projects/${projectId}/generation/latest`),'
+  );
+}
+fs.writeFileSync(finalQualityApiPath,finalQualityApi);
+
+const finalQualityPagePath=path.join(root,"frontend/app/projects/new/page.tsx");
+let finalQualityPage=fs.readFileSync(finalQualityPagePath,"utf8");
+if(!finalQualityPage.includes("const [finalQuality,setFinalQuality]")){
+  finalQualityPage=finalQualityPage.replace(
+    '  const [analysis,setAnalysis] = useState<AnalysisRun | null>(null);',
+    '  const [analysis,setAnalysis] = useState<AnalysisRun | null>(null);\n  const [finalQuality,setFinalQuality] = useState<{coverage:number|null;used:number|null;total:number|null;slideCount:number|null;sourceRefs:number|null;line:string}>({coverage:null,used:null,total:null,slideCount:null,sourceRefs:null,line:""});'
+  );
+  finalQualityPage=finalQualityPage.replace(
+    '      await api.waitForJob(job.id, watch("AI đang sinh bài giảng hoàn chỉnh"));\n      setStage("done");',
+    '      await api.waitForJob(job.id, watch("AI đang sinh bài giảng hoàn chỉnh"));\n      const generated=await api.latestGeneration(project.id); const coverageLine=(generated.warnings||[]).map(String).find(w=>w.includes("Độ phủ nguồn trong bài sinh"))||""; const coverageMatch=coverageLine.match(/(\\d+)%.*?\\((\\d+)\\/(\\d+) source chunks/); setFinalQuality({coverage:coverageMatch?Number(coverageMatch[1]):null,used:coverageMatch?Number(coverageMatch[2]):null,total:coverageMatch?Number(coverageMatch[3]):null,slideCount:generated.slide_count??null,sourceRefs:generated.source_ref_count??null,line:coverageLine});\n      setStage("done");'
+  );
+  finalQualityPage=finalQualityPage.replace(
+    '<div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-emerald-50 text-4xl">✓</div><h2 className="mt-5 text-2xl font-black">Bài giảng đã sẵn sàng</h2><p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">Nội dung, hoạt động học sinh, tương tác, lời giảng, visual prompt và source refs đã được tạo. Tiếp tục sang Editor để tinh chỉnh.</p><button onClick={()=>location.href="/projects/"+project.id+"/editor"} className="mt-6 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-indigo-100">Mở trình chỉnh sửa →</button>',
+    '<div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-emerald-50 text-4xl">✓</div><h2 className="mt-5 text-2xl font-black">Bài giảng đã sẵn sàng</h2><p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">Nội dung, hoạt động học sinh, tương tác, lời giảng, visual prompt và source refs đã được tạo. Tiếp tục sang Editor để tinh chỉnh.</p><div className="mx-auto mt-6 grid max-w-2xl gap-3 sm:grid-cols-3"><div className={"rounded-2xl border p-4 "+((finalQuality.coverage??0)>=90?"border-emerald-200 bg-emerald-50":"border-amber-200 bg-amber-50")}><div className="text-[10px] font-black uppercase tracking-wider text-slate-500">Độ phủ nguồn cuối</div><div className="mt-1 text-2xl font-black">{finalQuality.coverage!==null?finalQuality.coverage+"%":"—"}</div><div className="mt-1 text-[10px] text-slate-500">{finalQuality.used!==null&&finalQuality.total!==null?finalQuality.used+"/"+finalQuality.total+" chunks":"Đang tổng hợp"}</div></div><div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4"><div className="text-[10px] font-black uppercase tracking-wider text-indigo-500">Slide đã sinh</div><div className="mt-1 text-2xl font-black text-indigo-800">{finalQuality.slideCount??"—"}</div><div className="mt-1 text-[10px] text-indigo-500">màn hình bài học</div></div><div className="rounded-2xl border border-violet-100 bg-violet-50 p-4"><div className="text-[10px] font-black uppercase tracking-wider text-violet-500">Source refs</div><div className="mt-1 text-2xl font-black text-violet-800">{finalQuality.sourceRefs??"—"}</div><div className="mt-1 text-[10px] text-violet-500">dẫn chiếu nội dung</div></div></div><button onClick={()=>location.href="/projects/"+project.id+"/editor"} className="mt-6 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-indigo-100">Mở trình chỉnh sửa →</button>'
+  );
+}
+fs.writeFileSync(finalQualityPagePath,finalQualityPage);
