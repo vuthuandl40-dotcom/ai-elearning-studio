@@ -225,3 +225,58 @@ if(!classroomNav.includes('<TeacherNav active="classrooms"/>')){
   }
 }
 fs.writeFileSync(classroomNavPath,classroomNav);
+
+
+const deleteApiPath=path.join(root,"frontend/lib/api.ts");
+let deleteApi=fs.readFileSync(deleteApiPath,"utf8");
+if(!deleteApi.includes("deleteProject:")){
+  deleteApi=deleteApi.replace(
+    '  updateProject: (id: string, patch: Partial<Project>) => request<Project>(`/projects/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),',
+    '  updateProject: (id: string, patch: Partial<Project>) => request<Project>(`/projects/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),\n  deleteProject: (id: string) => request<{message:string}>(`/projects/${id}`, { method: "DELETE" }),'
+  );
+}
+fs.writeFileSync(deleteApiPath,deleteApi);
+
+const deleteLibraryPath=path.join(root,"frontend/app/library/page.tsx");
+let deleteLibrary=fs.readFileSync(deleteLibraryPath,"utf8");
+if(!deleteLibrary.includes('const [deleting,setDeleting]')){
+  deleteLibrary=deleteLibrary.replace(
+    '  const [error,setError]=useState("");',
+    '  const [error,setError]=useState("");\n  const [deleting,setDeleting]=useState("");'
+  );
+  deleteLibrary=deleteLibrary.replace(
+    '  return <main className="min-h-screen bg-[#f6f8fe] text-slate-900">',
+    '  async function removeProject(p:Project){ if(!window.confirm(`Xóa bài giảng “${p.title}”?\\n\\nBài giảng và dữ liệu liên quan sẽ bị xóa khỏi workspace.`))return; setDeleting(p.id); setError(""); try{await api.deleteProject(p.id);setProjects(rows=>rows.filter(x=>x.id!==p.id));}catch(e){setError(e instanceof Error?e.message:"Không xóa được bài giảng");}finally{setDeleting("");} }\n\n  return <main className="min-h-screen bg-[#f6f8fe] text-slate-900">'
+  );
+  deleteLibrary=deleteLibrary.replace(
+    '<div className="flex gap-1"><button onClick={()=>location.href="/projects/"+p.id+"/analytics" className="rounded-lg border border-slate-200 px-2 py-1 text-[9px] font-black text-slate-500">Analytics</button><button onClick={()=>location.href="/projects/"+p.id+"/editor" className="rounded-lg bg-slate-900 px-2 py-1 text-[9px] font-black text-white">Mở</button></div>',
+    '<div className="flex gap-1"><button onClick={()=>location.href="/projects/"+p.id+"/analytics" className="rounded-lg border border-slate-200 px-2 py-1 text-[9px] font-black text-slate-500">Analytics</button><button disabled={deleting===p.id} onClick={()=>removeProject(p)} className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[9px] font-black text-rose-700 disabled:opacity-40">{deleting===p.id?"Đang xóa…":"Xóa"}</button><button onClick={()=>location.href="/projects/"+p.id+"/editor" className="rounded-lg bg-slate-900 px-2 py-1 text-[9px] font-black text-white">Mở</button></div>'
+  );
+  deleteLibrary=deleteLibrary.replace(
+    '<td className="px-4 text-right"><button onClick={()=>location.href="/projects/"+p.id+"/analytics" className="mr-2 rounded-lg border px-2.5 py-1.5 text-[10px] font-black">Analytics</button><button onClick={()=>location.href="/projects/"+p.id+"/editor" className="rounded-lg bg-indigo-600 px-3 py-1.5 text-[10px] font-black text-white">Mở Editor</button></td>',
+    '<td className="px-4 text-right"><button onClick={()=>location.href="/projects/"+p.id+"/analytics" className="mr-2 rounded-lg border px-2.5 py-1.5 text-[10px] font-black">Analytics</button><button disabled={deleting===p.id} onClick={()=>removeProject(p)} className="mr-2 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[10px] font-black text-rose-700 disabled:opacity-40">{deleting===p.id?"Đang xóa…":"Xóa"}</button><button onClick={()=>location.href="/projects/"+p.id+"/editor" className="rounded-lg bg-indigo-600 px-3 py-1.5 text-[10px] font-black text-white">Mở Editor</button></td>'
+  );
+}
+fs.writeFileSync(deleteLibraryPath,deleteLibrary);
+
+const deleteDashboardPath=path.join(root,"frontend/app/page.tsx");
+let deleteDashboard=fs.readFileSync(deleteDashboardPath,"utf8");
+if(!deleteDashboard.includes('const [deleting, setDeleting]')){
+  deleteDashboard=deleteDashboard.replace(
+    '  const [error, setError] = useState("");',
+    '  const [error, setError] = useState("");\n  const [deleting, setDeleting] = useState("");'
+  );
+  deleteDashboard=deleteDashboard.replace(
+    '  const stats = useMemo(() => {',
+    '  async function removeProject(p: Project) { if (!window.confirm(`Xóa bài giảng “${p.title}”?\\n\\nBài giảng và dữ liệu liên quan sẽ bị xóa khỏi workspace.`)) return; setDeleting(p.id); setError(""); try { await api.deleteProject(p.id); setProjects(rows => rows.filter(x => x.id !== p.id)); } catch (e) { setError(e instanceof Error ? e.message : "Không xóa được bài giảng"); } finally { setDeleting(""); } }\n\n  const stats = useMemo(() => {'
+  );
+  deleteDashboard=deleteDashboard.replace(
+    '{projects.slice(0,8).map((p,i) => <button key={p.id} onClick={() => location.href=`/projects/${p.id}/editor`} className="group overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-xl">',
+    '{projects.slice(0,8).map((p,i) => <article key={p.id} onClick={() => location.href=`/projects/${p.id}/editor`} role="button" tabIndex={0} className="group cursor-pointer overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-xl">'
+  );
+  deleteDashboard=deleteDashboard.replace(
+    '<div className="mt-3 flex items-center justify-between"><span className="rounded-full bg-indigo-50 px-2 py-1 text-[9px] font-black text-indigo-700">{statusLabel(p.status)}</span><span className="text-[10px] font-black text-indigo-600">Mở Editor →</span></div></div>\n            </button>)}',
+    '<div className="mt-3 flex items-center justify-between gap-2"><span className="rounded-full bg-indigo-50 px-2 py-1 text-[9px] font-black text-indigo-700">{statusLabel(p.status)}</span><div className="flex items-center gap-2"><button disabled={deleting===p.id} onClick={(e)=>{e.stopPropagation();removeProject(p)}} className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[9px] font-black text-rose-700 disabled:opacity-40">{deleting===p.id?"Đang xóa…":"Xóa"}</button><span className="text-[10px] font-black text-indigo-600">Mở Editor →</span></div></div></div>\n            </article>)}'
+  );
+}
+fs.writeFileSync(deleteDashboardPath,deleteDashboard);
