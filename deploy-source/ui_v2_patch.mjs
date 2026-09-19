@@ -194,7 +194,7 @@ for(const [rel,active] of [
 ]){
   const p=path.join(root,rel);
   let x=fs.readFileSync(p,"utf8");
-  if(!x.includes('components/shell/TeacherNav')) x=x.replace('import {', 'import TeacherNav from "@/components/shell/TeacherNav";\nimport {');
+  if(!x.includes('components/shell/TeacherNav')) { if(x.includes('import {')) x=x.replace('import {', 'import TeacherNav from "@/components/shell/TeacherNav";\nimport {'); else x=x.replace('"use client";', '"use client";\n\nimport TeacherNav from "@/components/shell/TeacherNav";'); }
   const needle='<div className="mx-auto max-w-';
   const idx=x.indexOf(needle);
   if(idx>=0){
