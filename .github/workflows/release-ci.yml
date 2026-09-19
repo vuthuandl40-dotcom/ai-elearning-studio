@@ -39,6 +39,17 @@ jobs:
           mkdir src
           tar -xJf source.tar.xz -C src
           patch -d src -p1 < deploy-source/patches/0001-lesson-editor-null-project.patch
+      - name: Inspect source-grounding pipeline
+        working-directory: src
+        run: |
+          echo "=== PIPELINE FILES ==="
+          find app -maxdepth 4 -type f | grep -E 'source|analy|planner|lesson_writer|ingest|extract|chunk|document|generation' | sort | head -n 240
+          echo "=== SOURCE ANALYZER REFERENCES ==="
+          grep -RInE 'class .*Analyzer|def .*analy|SourceChunk|chunk_size|chunk_overlap|extract_text|python-docx|docx|pypdf|pdf' app --exclude-dir=__pycache__ | head -n 520 || true
+          echo "=== PLANNER REFERENCES ==="
+          grep -RInE 'source_chunk_ids|section_plan|topic_titles|objective_numbers|planning_run' app/services app/api --exclude-dir=__pycache__ | head -n 520 || true
+          echo "=== WRITER REFERENCES ==="
+          grep -RInE 'build_local_section_draft|chunks_by_id|source_refs|generate.*section|LessonDraft' app/services app/api --exclude-dir=__pycache__ | head -n 520 || true
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
