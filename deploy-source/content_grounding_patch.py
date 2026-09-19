@@ -455,3 +455,59 @@ if old in s:
 p.write_text(s)
 
 print("planner-source-order-and-coverage-status-ok")
+
+
+# 12) Report final generated-lesson source coverage.
+p=root/"app/services/lesson_writer/service.py"
+s=p.read_text()
+if "def _draft_source_coverage(" not in s:
+    marker='''def _persist_draft(
+'''
+    helper='''def _draft_source_coverage(draft: LessonDraft, plan: dict) -> tuple[float, int, int]:
+    planned: set[str] = set()
+    for section in plan.get("sections", []):
+        if section.get("section_key") in {"explore_1", "explore_2", "explore_3"}:
+            planned.update(section.get("source_chunk_ids") or [])
+    if not planned:
+        return 1.0, 0, 0
+
+    used: set[str] = set()
+    for slide in draft.slides:
+        used.update(ref.source_chunk_id for ref in slide.source_refs if ref.source_chunk_id in planned)
+        if slide.interaction:
+            used.update(chunk_id for chunk_id in slide.interaction.source_chunk_ids if chunk_id in planned)
+    return len(used) / len(planned), len(used), len(planned)
+
+
+'''
+    if marker not in s:
+        raise RuntimeError("lesson writer persist marker not found")
+    s=s.replace(marker,helper+marker)
+
+old='''        lesson_draft = validate_and_repair_draft(
+            lesson_draft,
+            plan=plan,
+            valid_chunk_ids=valid_chunk_ids,
+            source_policy=project.source_policy,
+        )
+        slide_count, ref_count = _persist_draft(
+'''
+new='''        lesson_draft = validate_and_repair_draft(
+            lesson_draft,
+            plan=plan,
+            valid_chunk_ids=valid_chunk_ids,
+            source_policy=project.source_policy,
+        )
+        final_coverage, used_source_count, planned_source_count = _draft_source_coverage(lesson_draft, plan)
+        lesson_draft.warnings.append(
+            f"Độ phủ nguồn trong bài sinh: {round(final_coverage * 100)}% "
+            f"({used_source_count}/{planned_source_count} source chunks thực sự được dùng)."
+        )
+        slide_count, ref_count = _persist_draft(
+'''
+if old not in s:
+    raise RuntimeError("lesson draft validation marker not found")
+s=s.replace(old,new)
+p.write_text(s)
+
+print("generation-source-coverage-report-ok")
