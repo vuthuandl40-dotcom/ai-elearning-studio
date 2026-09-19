@@ -125,3 +125,25 @@ newProjectDirect=newProjectDirect.replace(
   '<div className="my-4 flex items-center gap-3 text-[10px] font-black uppercase tracking-wider text-slate-300"><span className="h-px flex-1 bg-slate-200"/><span>hoặc nhập nội dung trực tiếp</span><span className="h-px flex-1 bg-slate-200"/></div><textarea disabled={!project} value={directText} onChange={e=>setDirectText(e.target.value)} rows={5} className="input resize-y text-xs leading-5" placeholder="Dán nội dung bài học, chủ đề, yêu cầu cần đạt hoặc nội dung muốn AI phân tích…"/><div className="mt-4 flex flex-wrap gap-2">{["Tạo bài về biến đổi khí hậu","Bài học Python","Giáo án Toán","Song ngữ Anh - Việt"].map(x=><button type="button" key={x} onClick={()=>setDirectText(x)} className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-[10px] font-bold text-slate-500 hover:bg-indigo-50 hover:text-indigo-700">{x}</button>)}</div>'
 );
 fs.writeFileSync(newProjectDirectPath,newProjectDirect);
+
+const dashboardAuthPath=path.join(root,"frontend/app/page.tsx");
+let dashboardAuth=fs.readFileSync(dashboardAuthPath,"utf8");
+dashboardAuth=dashboardAuth.replace('import type { Project } from "@/lib/types";','import type { AuthUser, Project } from "@/lib/types";');
+dashboardAuth=dashboardAuth.replace('const [projects, setProjects] = useState<Project[]>([]);','const [projects, setProjects] = useState<Project[]>([]);\n  const [user, setUser] = useState<AuthUser | null>(null);');
+dashboardAuth=dashboardAuth.replace(
+  'api.listProjects().then(setProjects).catch((e) => setError(e.message)).finally(() => setLoading(false));',
+  'Promise.all([api.me(), api.listProjects()]).then(([me,items]) => { setUser(me); setProjects(items); }).catch((e) => { if ((e as any)?.status===401) { location.href="/login"; return; } setError(e.message); }).finally(() => setLoading(false));'
+);
+dashboardAuth=dashboardAuth.replace('<span className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-slate-700 to-slate-900 text-sm font-black text-white">GV</span>','<span className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-slate-700 to-slate-900 text-sm font-black text-white">{(user?.display_name||user?.email||"GV").slice(0,1).toUpperCase()}</span>');
+dashboardAuth=dashboardAuth.replace('<span className="block text-xs font-black">Giáo viên</span>','<span className="block max-w-32 truncate text-xs font-black">{user?.display_name||"Giáo viên"}</span>');
+dashboardAuth=dashboardAuth.replace('Xin chào, Giáo viên 👋','Xin chào, {user?.display_name||"Giáo viên"} 👋');
+fs.writeFileSync(dashboardAuthPath,dashboardAuth);
+
+for(const rel of ["frontend/app/library/page.tsx","frontend/app/students/page.tsx","frontend/app/reports/page.tsx"]){
+  const p=path.join(root,rel);
+  let x=fs.readFileSync(p,"utf8");
+  x=x.replace('setError(e.message)', '((e as any)?.status===401 ? (location.href="/login") : setError(e.message))');
+  x=x.replace('setError(e instanceof Error?e.message:"Không tải được danh sách học sinh")', '((e as any)?.status===401 ? (location.href="/login") : setError(e instanceof Error?e.message:"Không tải được danh sách học sinh"))');
+  x=x.replace('setError(e instanceof Error?e.message:"Không tải được báo cáo")', '((e as any)?.status===401 ? (location.href="/login") : setError(e instanceof Error?e.message:"Không tải được báo cáo"))');
+  fs.writeFileSync(p,x);
+}
