@@ -371,3 +371,34 @@ if(!sourcePreview.includes("const [analysis,setAnalysis]")){
   );
 }
 fs.writeFileSync(sourcePreviewPath,sourcePreview);
+
+
+const sourceGatePath=path.join(root,"frontend/app/projects/new/page.tsx");
+let sourceGate=fs.readFileSync(sourceGatePath,"utf8");
+if(!sourceGate.includes("const sourceReady =")){
+  sourceGate=sourceGate.replace(
+    '  const sourceQualityInfo = useMemo(() => {',
+    '  const sourceQualityInfo = useMemo(() => {'
+  );
+  sourceGate=sourceGate.replace(
+    '  const fail = (e: unknown) =>',
+    '  const sourceReady = knowledgeTopics.length>0 && (sourceQualityInfo.coverage??0)>=95;\n  const fail = (e: unknown) =>'
+  );
+  sourceGate=sourceGate.replace(
+    '<button disabled={!!busy} onClick={approveAndGenerate} className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-black text-white">Duyệt & sinh bài giảng →</button>',
+    '<div className="text-right"><button disabled={!!busy||!sourceReady} onClick={approveAndGenerate} className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40">Duyệt & sinh bài giảng →</button>{!sourceReady?<div className="mt-2 max-w-xs text-[10px] font-bold text-rose-600">Chưa đủ điều kiện sinh bài: cần đọc được nội dung nguồn và độ phủ nguồn ≥ 95%.</div>:null}</div>'
+  );
+}
+fs.writeFileSync(sourceGatePath,sourceGate);
+
+for(const rel of ["frontend/app/library/page.tsx","frontend/app/page.tsx"]){
+  const p=path.join(root,rel);
+  let x=fs.readFileSync(p,"utf8");
+  if(x.includes('const aj=await api.createJob(p.id,"analyze"') && !x.includes("Không đọc được nội dung từ giáo án gốc")){
+    x=x.replace(
+      'await api.waitForJob(aj.id); const pj=await api.createJob',
+      'await api.waitForJob(aj.id); const analyzed=await api.latestAnalysis(p.id); const km=(analyzed.knowledge_map||{}) as Record<string,unknown>; const topics=Array.isArray(km.topics)?km.topics:[]; if(!topics.length) throw new Error("Không đọc được nội dung từ giáo án gốc. Hãy kiểm tra file nguồn trước khi tạo lại."); const pj=await api.createJob'
+    );
+  }
+  fs.writeFileSync(p,x);
+}
