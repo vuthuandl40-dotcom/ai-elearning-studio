@@ -55,6 +55,13 @@ jobs:
         run: |
           python -m compileall -q app alembic
           python -c 'import app.main; print("backend-import-ok")'
+      - name: V2 advanced-interaction probe
+        working-directory: src
+        run: |
+          echo "=== INTERACTION TYPES ==="
+          grep -RInE 'matching|drag_drop|interaction_type|correct_answer|answer_payload' app frontend --exclude-dir=node_modules | head -n 520 || true
+          echo "=== LEARNER ANSWER API ==="
+          grep -RIn -B 15 -A 55 -E 'submit.*answer|learner.*answer|answer.*correct|grade.*interaction' app | head -n 520 || true
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
