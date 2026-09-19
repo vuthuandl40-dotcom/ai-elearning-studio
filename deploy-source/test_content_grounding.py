@@ -71,3 +71,19 @@ fake_section=SimpleNamespace(
 coverage=_section_ref_coverage(fake_section,{"source_chunk_ids":["a","b","c","d"]})
 assert abs(coverage-0.25)<1e-9, coverage
 print("writer-source-coverage-regression-ok")
+
+
+from app.services.lesson_writer.service import _draft_source_coverage
+
+draft=SimpleNamespace(slides=[
+    SimpleNamespace(source_refs=[SimpleNamespace(source_chunk_id="a"),SimpleNamespace(source_chunk_id="b")], interaction=None),
+    SimpleNamespace(source_refs=[SimpleNamespace(source_chunk_id="c")], interaction=SimpleNamespace(source_chunk_ids=["d"])),
+])
+coverage,used,total=_draft_source_coverage(draft,{"sections":[
+    {"section_key":"explore_1","source_chunk_ids":["a","b"]},
+    {"section_key":"explore_2","source_chunk_ids":["c"]},
+    {"section_key":"explore_3","source_chunk_ids":["d","e"]},
+]})
+assert (used,total)==(4,5)
+assert abs(coverage-0.8)<1e-9, coverage
+print("final-draft-source-coverage-regression-ok")
