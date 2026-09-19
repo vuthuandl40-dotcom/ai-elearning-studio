@@ -155,3 +155,11 @@ const dashAssistantPath=path.join(root,"frontend/app/page.tsx");
 let dashAssistant=fs.readFileSync(dashAssistantPath,"utf8");
 dashAssistant=dashAssistant.replace('{ icon: "✧", label: "AI trợ lý", href: "/projects/new" }','{ icon: "✧", label: "AI trợ lý", href: "/assistant" }');
 fs.writeFileSync(dashAssistantPath,dashAssistant);
+
+const inspectorAiPath=path.join(root,"frontend/components/editor/Inspector.tsx");
+let inspectorAi=fs.readFileSync(inspectorAiPath,"utf8");
+inspectorAi=inspectorAi.replace(
+  'const [tab, setTab] = useState<Tab>("content");',
+  'const [tab, setTab] = useState<Tab>(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("panel") === "ai" ? "copilot" : "content");'
+);
+fs.writeFileSync(inspectorAiPath,inspectorAi);
