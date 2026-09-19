@@ -40,6 +40,18 @@ jobs:
           tar -xJf source.tar.xz -C src
           patch -d src -p1 < deploy-source/patches/0001-lesson-editor-null-project.patch
           python deploy-source/content_grounding_patch.py src
+      - name: Inspect project delete integration
+        working-directory: src
+        run: |
+          echo "PROJECTS_ROUTE_BEGIN"
+          sed -n '1,260p' app/api/routes/projects.py
+          echo "PROJECTS_ROUTE_END"
+          echo "FRONT_API_BEGIN"
+          sed -n '1,300p' frontend/lib/api.ts
+          echo "FRONT_API_END"
+          echo "LIBRARY_PAGE_BEGIN"
+          sed -n '1,360p' frontend/app/library/page.tsx
+          echo "LIBRARY_PAGE_END"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
