@@ -457,3 +457,26 @@ if(!libraryQuality.includes("coverageText")){
   );
 }
 fs.writeFileSync(libraryQualityPath,libraryQuality);
+
+
+const generationQualityFixApi=path.join(root,"frontend/lib/api.ts");
+let generationQualityFix=fs.readFileSync(generationQualityFixApi,"utf8");
+if(!generationQualityFix.includes("latestGenerationQuality:")){
+  generationQualityFix=generationQualityFix.replace(
+    '  latestPlan: (projectId: string) => request<PlanningRun>(`/projects/${projectId}/plan/latest`),',
+    '  latestPlan: (projectId: string) => request<PlanningRun>(`/projects/${projectId}/plan/latest`),\n  latestGenerationQuality: (projectId: string) => request<{ id:string; teacher_approved:boolean; warnings?: string[]; slide_count?: number; source_ref_count?: number; generation_json?: unknown }>(`/projects/${projectId}/generation/latest`),'
+  );
+}
+fs.writeFileSync(generationQualityFixApi,generationQualityFix);
+
+for(const rel of [
+  "frontend/app/projects/new/page.tsx",
+  "frontend/app/library/page.tsx",
+  "frontend/components/editor/TopBar.tsx",
+]){
+  const p=path.join(root,rel);
+  let x=fs.readFileSync(p,"utf8");
+  x=x.replaceAll("api.latestGeneration(project.id)","api.latestGenerationQuality(project.id)");
+  x=x.replaceAll("api.latestGeneration(p.id)","api.latestGenerationQuality(p.id)");
+  fs.writeFileSync(p,x);
+}
