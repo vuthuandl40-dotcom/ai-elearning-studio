@@ -91,6 +91,7 @@ jobs:
           cat /tmp/health.json
           curl -fsS http://127.0.0.1:8000/ready
           bash deploy-source/test_e2e_lesson_pipeline.sh
+          bash deploy-source/test_pptx_upload_pipeline.sh
           bash deploy-source/test_large_pptx_upload.sh
           python deploy-source/test_project_access.py
           python deploy-source/test_teacher_tool_access.py
