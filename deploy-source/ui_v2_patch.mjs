@@ -658,7 +658,8 @@ let createShell=fs.readFileSync(createShellPath,"utf8");
 if(!createShell.includes('components/shell/TeacherHeader')){
   createShell=createShell.replace('"use client";','"use client";\\n\\nimport TeacherHeader from "@/components/shell/TeacherHeader";\\nimport TeacherNav from "@/components/shell/TeacherNav";');
 }
-createShell=createShell.replace(/<header className="border-b border-indigo-100 bg-white">[\\s\\S]*?<\\/header>/,'<TeacherHeader title="Tạo bài giảng với AI"/>');
+const createHeaderStart=createShell.indexOf('<header className="border-b border-indigo-100 bg-white">');
+if(createHeaderStart>=0){const createHeaderEnd=createShell.indexOf("</header>",createHeaderStart);if(createHeaderEnd>=0)createShell=createShell.slice(0,createHeaderStart)+'<TeacherHeader title="Tạo bài giảng với AI"/>'+createShell.slice(createHeaderEnd+9);}
 if(!createShell.includes('<TeacherNav active="create"/>')){
   createShell=createShell.replace('    <div className="mx-auto max-w-7xl p-4 md:p-7">','    <div className="flex"><TeacherNav active="create"/><div className="min-w-0 flex-1"><div className="mx-auto max-w-7xl p-4 md:p-7">');
   const shellCloseMarker='    </div>\\n    <style jsx global>';
