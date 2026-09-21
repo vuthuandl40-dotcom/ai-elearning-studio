@@ -608,7 +608,7 @@ for(const rel of ["frontend/app/page.tsx","frontend/app/library/page.tsx","front
   if(!fs.readFileSync(path.join(root,rel),"utf8").includes("TeacherHeader")) throw new Error("Shared teacher header missing from "+rel);
 }
 const uiNewCheck=fs.readFileSync(path.join(root,"frontend/app/projects/new/page.tsx"),"utf8");
-for(const token of ["Tải tài liệu","AI phân tích","Tùy chỉnh","Hoàn thành","directText","Độ phủ nguồn","Nội dung AI đã đọc"]){
+for(const token of ["Tải học liệu","AI phân tích","Tùy chỉnh","Hoàn thành","directText","Độ phủ nguồn","Nội dung AI đã đọc"]){
   if(!uiNewCheck.includes(token)) throw new Error("New lesson flow missing: "+token);
 }
 const uiInspectorCheck=fs.readFileSync(path.join(root,"frontend/components/editor/Inspector.tsx"),"utf8");
