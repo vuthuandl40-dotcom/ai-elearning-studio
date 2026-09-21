@@ -507,3 +507,74 @@ exportDownloadFixPage=exportDownloadFixPage.replace(
   '{downloadable?<button onClick={async()=>{setError("");try{await api.downloadExport(r as never);setNotice("Đã tải "+(r.file_name||"file xuất")+".")}catch(e){setError(e instanceof Error?e.message:"Không tải được file")}}} className="rounded-lg bg-slate-900 px-3 py-1.5 text-[10px] font-black text-white">Tải lại</button>:<span className="text-[10px] text-slate-300">—</span>}'
 );
 fs.writeFileSync(exportDownloadFixPagePath,exportDownloadFixPage);
+
+
+const teacherHeaderPath=path.join(root,"frontend/components/shell/TeacherHeader.tsx");
+fs.writeFileSync(teacherHeaderPath,`"use client";
+
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
+import type { AuthUser } from "@/lib/types";
+
+export default function TeacherHeader({title}:{title?:string}){
+  const [user,setUser]=useState<AuthUser|null>(null);
+  const [query,setQuery]=useState("");
+  useEffect(()=>{api.me().then(setUser).catch(()=>undefined)},[]);
+  const display=user?.display_name||user?.email||"Giáo viên";
+  const initials=display.split(/\\s+/).filter(Boolean).slice(-2).map(x=>x.slice(0,1).toUpperCase()).join("")||"GV";
+  function search(){
+    const q=query.trim();
+    location.href=q?"/library?q="+encodeURIComponent(q):"/library";
+  }
+  return <header className="sticky top-0 z-50 border-b border-indigo-100 bg-white/95 backdrop-blur">
+    <div className="flex h-[68px] items-center gap-3 px-4 md:px-6">
+      <button onClick={()=>location.href="/"} className="flex shrink-0 items-center gap-2.5">
+        <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-500 text-lg text-white shadow-lg shadow-indigo-200">▰</span>
+        <span className="hidden text-lg font-black tracking-tight text-indigo-800 xl:block">AI E-Learning Studio</span>
+      </button>
+      {title&&<><div className="hidden h-7 w-px bg-slate-200 lg:block"/><span className="hidden max-w-44 truncate text-sm font-semibold text-slate-500 lg:block">{title}</span></>}
+      <form onSubmit={e=>{e.preventDefault();search()}} className="mx-auto hidden w-full max-w-md md:block">
+        <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 focus-within:border-indigo-300 focus-within:bg-white">
+          <span className="text-slate-400">⌕</span>
+          <input value={query} onChange={e=>setQuery(e.target.value)} className="min-w-0 flex-1 bg-transparent px-2 py-2.5 text-xs outline-none" placeholder="Tìm bài giảng, lớp học, nội dung…"/>
+        </div>
+      </form>
+      <div className="ml-auto flex shrink-0 items-center gap-1.5">
+        <span className="hidden rounded-xl border border-violet-100 bg-violet-50 px-2.5 py-2 text-[10px] font-black text-violet-700 lg:block">STAGING</span>
+        <span className="hidden rounded-xl border border-emerald-100 bg-emerald-50 px-2.5 py-2 text-[10px] font-black text-emerald-700 xl:block">● Sẵn sàng triển khai</span>
+        <button type="button" title="Thông báo" className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-sm text-slate-500 hover:bg-slate-50">♢</button>
+        <button type="button" onClick={()=>location.href="/settings"} className="flex items-center gap-2 rounded-xl px-1.5 py-1 hover:bg-slate-50">
+          <span className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-slate-700 to-slate-900 text-[11px] font-black text-white">{initials}</span>
+          <span className="hidden max-w-32 text-left lg:block"><span className="block truncate text-xs font-black">{display}</span><span className="block text-[9px] text-slate-400">{user?.role==="admin"?"Quản trị viên":"Giáo viên"}</span></span>
+        </button>
+      </div>
+    </div>
+  </header>;
+}
+`);
+
+function addTeacherHeader(rel,title){
+  const p=path.join(root,rel);
+  if(!fs.existsSync(p))return;
+  let x=fs.readFileSync(p,"utf8");
+  if(!x.includes('components/shell/TeacherHeader')){
+    if(x.includes('"use client";')) x=x.replace('"use client";','"use client";\\n\\nimport TeacherHeader from "@/components/shell/TeacherHeader";');
+    else x='import TeacherHeader from "@/components/shell/TeacherHeader";\\n'+x;
+  }
+  x=x.replace(/<header className="sticky top-0 z-40[\\s\\S]*?<\\/header>/,'<TeacherHeader title="'+title+'"/>');
+  x=x.replace(/<header className="sticky top-0 z-50[\\s\\S]*?<\\/header>/,'<TeacherHeader title="'+title+'"/>');
+  fs.writeFileSync(p,x);
+}
+
+for(const [rel,title] of [
+  ["frontend/app/page.tsx","Trang chủ"],
+  ["frontend/app/library/page.tsx","Thư viện bài giảng"],
+  ["frontend/app/classrooms/page.tsx","Lớp học"],
+  ["frontend/app/students/page.tsx","Học sinh"],
+  ["frontend/app/reports/page.tsx","Báo cáo"],
+  ["frontend/app/assistant/page.tsx","AI trợ lý"],
+  ["frontend/app/templates/page.tsx","Kho mẫu"],
+  ["frontend/app/settings/page.tsx","Cài đặt"],
+]){
+  addTeacherHeader(rel,title);
+}
