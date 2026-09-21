@@ -534,6 +534,7 @@ from app.db.models import (
     ExportRun,
     LessonObjective,
     LessonSection,
+    LearnerAttempt,
     MediaAsset,
     Project,
     Slide,
