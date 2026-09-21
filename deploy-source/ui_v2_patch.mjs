@@ -578,3 +578,50 @@ for(const [rel,title] of [
 ]){
   addTeacherHeader(rel,title);
 }
+
+
+const requiredUiRoutes=[
+  "frontend/app/page.tsx",
+  "frontend/app/projects/new/page.tsx",
+  "frontend/app/library/page.tsx",
+  "frontend/app/classrooms/page.tsx",
+  "frontend/app/students/page.tsx",
+  "frontend/app/reports/page.tsx",
+  "frontend/app/assistant/page.tsx",
+  "frontend/app/templates/page.tsx",
+  "frontend/app/settings/page.tsx",
+  "frontend/app/projects/[projectId]/export/page.tsx",
+  "frontend/app/projects/[projectId]/editor/page.tsx",
+];
+for(const rel of requiredUiRoutes){
+  if(!fs.existsSync(path.join(root,rel))) throw new Error("UI route missing: "+rel);
+}
+const uiNavCheck=fs.readFileSync(path.join(root,"frontend/components/shell/TeacherNav.tsx"),"utf8");
+for(const label of ["Trang chủ","Tạo bài giảng","Thư viện","Lớp học","Học sinh","Báo cáo","AI trợ lý","Kho mẫu","Cài đặt"]){
+  if(!uiNavCheck.includes(label)) throw new Error("Teacher navigation missing: "+label);
+}
+const uiHeaderCheck=fs.readFileSync(path.join(root,"frontend/components/shell/TeacherHeader.tsx"),"utf8");
+for(const token of ["STAGING","Sẵn sàng triển khai","Tìm bài giảng","Thông báo","api.me()"]){
+  if(!uiHeaderCheck.includes(token)) throw new Error("Teacher header missing: "+token);
+}
+for(const rel of ["frontend/app/page.tsx","frontend/app/library/page.tsx","frontend/app/classrooms/page.tsx","frontend/app/students/page.tsx","frontend/app/reports/page.tsx","frontend/app/assistant/page.tsx","frontend/app/templates/page.tsx","frontend/app/settings/page.tsx"]){
+  if(!fs.readFileSync(path.join(root,rel),"utf8").includes("TeacherHeader")) throw new Error("Shared teacher header missing from "+rel);
+}
+const uiNewCheck=fs.readFileSync(path.join(root,"frontend/app/projects/new/page.tsx"),"utf8");
+for(const token of ["Tải tài liệu","AI phân tích","Tùy chỉnh","Hoàn thành","directText","Độ phủ nguồn","Nội dung AI đã đọc"]){
+  if(!uiNewCheck.includes(token)) throw new Error("New lesson flow missing: "+token);
+}
+const uiInspectorCheck=fs.readFileSync(path.join(root,"frontend/components/editor/Inspector.tsx"),"utf8");
+for(const token of ["Nội dung","Thiết kế","Media","AI trợ lý","Nguồn"]){
+  if(!uiInspectorCheck.includes(token)) throw new Error("Editor inspector missing: "+token);
+}
+const uiExportCheck=fs.readFileSync(path.join(root,"frontend/app/projects/[projectId]/export/page.tsx"),"utf8");
+for(const token of ["PowerPoint","PDF","HTML5","SCORM 1.2","SCORM 2004","api.downloadExport"]){
+  if(!uiExportCheck.includes(token)) throw new Error("Export center missing: "+token);
+}
+if(uiExportCheck.includes("location.href=url")) throw new Error("Export Center still uses direct authenticated API navigation");
+const uiApiCheck=fs.readFileSync(path.join(root,"frontend/lib/api.ts"),"utf8");
+for(const token of ["downloadExport: async","credentials:\"include\"","URL.createObjectURL","a.download"]){
+  if(!uiApiCheck.includes(token)) throw new Error("Authenticated export download missing: "+token);
+}
+console.log("ui-v2-completeness-ok",requiredUiRoutes.length);
