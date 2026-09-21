@@ -205,7 +205,7 @@
      section = db.scalar(select(LessonSection).where(LessonSection.project_id == project_id, LessonSection.section_key == section_key))
      if not section:
          raise GenerationError("Section not found")
-@@ -461,6 +609,28 @@
+@@ -461,6 +609,32 @@
      objectives = _objectives(db, project_id)
      chunks = _chunks(db, project_id)
      chunks_by_id = {str(x.id): x for x in chunks}
@@ -238,7 +238,7 @@
      ai_enabled = bool(use_ai and settings.openai_api_key)
      writer = OpenAILessonWriter() if ai_enabled else None
      teacher_profile = _default_teacher_profile(db, project)
-@@ -479,13 +649,17 @@
+@@ -479,13 +653,17 @@
      db.refresh(run)
  
      try:
