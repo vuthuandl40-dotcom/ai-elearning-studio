@@ -656,20 +656,32 @@ fs.writeFileSync(uploadGuardPath,uploadGuard);
 const createShellPath=path.join(root,"frontend/app/projects/new/page.tsx");
 let createShell=fs.readFileSync(createShellPath,"utf8");
 if(!createShell.includes('components/shell/TeacherHeader')){
-  createShell=createShell.replace('"use client";','"use client";\\n\\nimport TeacherHeader from "@/components/shell/TeacherHeader";\\nimport TeacherNav from "@/components/shell/TeacherNav";');
+  createShell=createShell.replace('"use client";','"use client";\n\nimport TeacherHeader from "@/components/shell/TeacherHeader";\nimport TeacherNav from "@/components/shell/TeacherNav";');
 }
 const createHeaderStart=createShell.indexOf('<header className="border-b border-indigo-100 bg-white">');
 if(createHeaderStart>=0){const createHeaderEnd=createShell.indexOf("</header>",createHeaderStart);if(createHeaderEnd>=0)createShell=createShell.slice(0,createHeaderStart)+'<TeacherHeader title="Tạo bài giảng với AI"/>'+createShell.slice(createHeaderEnd+9);}
 if(!createShell.includes('<TeacherNav active="create"/>')){
   createShell=createShell.replace('    <div className="mx-auto max-w-7xl p-4 md:p-7">','    <div className="flex"><TeacherNav active="create"/><div className="min-w-0 flex-1"><div className="mx-auto max-w-7xl p-4 md:p-7">');
-  const shellCloseMarker='    </div>\\n    <style jsx global>';
+  const shellCloseMarker='    </div>\n    <style jsx global>';
   const shellClose=createShell.lastIndexOf(shellCloseMarker);
-  if(shellClose>=0){createShell=createShell.slice(0,shellClose)+'    </div></div></div>\\n    <style jsx global>'+createShell.slice(shellClose+shellCloseMarker.length);}
+  if(shellClose>=0){createShell=createShell.slice(0,shellClose)+'    </div></div></div>\n    <style jsx global>'+createShell.slice(shellClose+shellCloseMarker.length);}
 }
 if(!createShell.includes("function acceptSourceFiles")){
   createShell=createShell.replace(
     '  const watch = (label:string) => (job:BackgroundJob) => { setProgress(job); setBusy(label + " · " + job.status + " · " + job.progress + "%"); };',
-    '  const watch = (label:string) => (job:BackgroundJob) => { setProgress(job); setBusy(label + " · " + job.status + " · " + job.progress + "%"); };\\n  function acceptSourceFiles(selected: File[]) { const invalid=selected.find(file=>file.size>MAX_SOURCE_FILE_BYTES||!SOURCE_EXTENSIONS.some(ext=>file.name.toLowerCase().endsWith(ext))); if(invalid){setFiles([]);setError(invalid.size>MAX_SOURCE_FILE_BYTES?"Tệp “"+invalid.name+"” vượt quá giới hạn "+MAX_SOURCE_FILE_MB+" MB.":"Định dạng của “"+invalid.name+"” chưa được hỗ trợ. Hãy dùng PDF, DOCX, PPTX, TXT, PNG/JPG/WEBP.");return;} setError(""); setFiles(selected); }'
+    `  const watch = (label:string) => (job:BackgroundJob) => { setProgress(job); setBusy(label + " · " + job.status + " · " + job.progress + "%"); };
+  function acceptSourceFiles(selected: File[]) {
+    const invalid=selected.find(file=>file.size>MAX_SOURCE_FILE_BYTES||!SOURCE_EXTENSIONS.some(ext=>file.name.toLowerCase().endsWith(ext)));
+    if(invalid){
+      setFiles([]);
+      setError(invalid.size>MAX_SOURCE_FILE_BYTES
+        ? "Tệp “"+invalid.name+"” vượt quá giới hạn "+MAX_SOURCE_FILE_MB+" MB."
+        : "Định dạng của “"+invalid.name+"” chưa được hỗ trợ. Hãy dùng PDF, DOCX, PPTX, TXT, PNG/JPG/WEBP.");
+      return;
+    }
+    setError("");
+    setFiles(selected);
+  }`
   );
 }
 createShell=createShell.replace(/onChange=\\{e=>\\{const selected=Array\\.from\\(e\\.target\\.files\\|\\|\\[\\]\\);[\\s\\S]*?setFiles\\(selected\\);\\}\\}/,'onChange={e=>{acceptSourceFiles(Array.from(e.target.files||[]));e.currentTarget.value="";}}');
