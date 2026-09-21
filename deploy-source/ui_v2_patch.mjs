@@ -439,7 +439,7 @@ if(!editorQuality.includes("const [sourceCoverage,setSourceCoverage]")){
   editorQuality=editorQuality.replace('import { useState } from "react";','import { useEffect, useState } from "react";\nimport { api } from "@/lib/api";');
   editorQuality=editorQuality.replace(
     '  const [open, setOpen] = useState(false);',
-    '  const [open, setOpen] = useState(false);\n  const [sourceCoverage,setSourceCoverage]=useState<number|null>(null);\n  useEffect(()=>{let alive=true; api.latestGeneration(project.id).then(g=>{const line=(g.warnings||[]).map(String).find(w=>w.includes("Độ phủ nguồn trong bài sinh"))||""; const m=line.match(/(\\d+)%/); if(alive)setSourceCoverage(m?Number(m[1]):null);}).catch(()=>{if(alive)setSourceCoverage(null);}); return()=>{alive=false};},[project.id]);'
+    '  const [open, setOpen] = useState(false);\n  const [sourceCoverage,setSourceCoverage]=useState<number|null>(null);\n  useEffect(()=>{if(busy)return; let alive=true; api.latestGeneration(project.id).then(g=>{const line=(g.warnings||[]).map(String).find(w=>w.includes("Độ phủ nguồn trong bài sinh"))||""; const m=line.match(/(\\d+)%/); if(alive)setSourceCoverage(m?Number(m[1]):null);}).catch(()=>{if(alive)setSourceCoverage(null);}); return()=>{alive=false};},[project.id,busy]);'
   );
   editorQuality=editorQuality.replace(
     '<div className="flex items-center gap-2"><div className="truncate text-sm font-black">{project.title}</div>{dirty&&<span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-black text-amber-700">Chưa lưu</span>}</div>',
