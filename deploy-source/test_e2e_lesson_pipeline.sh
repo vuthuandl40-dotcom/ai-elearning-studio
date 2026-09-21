@@ -134,5 +134,26 @@ assert nonempty>=12, f"too many empty slides: {nonempty}/{len(slides)}"
 print("e2e-generate-source-grounding-ok", len(slides), hits, nonempty)
 PY
 
+export_json=$(curl -fsS -c "$COOKIE" -b "$COOKIE" -H 'Content-Type: application/json' -d '{"format":"pptx","include_notes":true,"include_sources":true,"include_quiz":true,"only_approved":false}' "$API/projects/$PROJECT_ID/exports")
+printf '%s' "$export_json" >/tmp/e2e-pptx-export.json
+EXPORT_ID=$(printf '%s' "$export_json" | python -c 'import json,sys; d=json.load(sys.stdin); assert d["status"]=="completed", d; print(d["id"])')
+curl -fsS -D /tmp/e2e-pptx.headers -c "$COOKIE" -b "$COOKIE" "$API/exports/$EXPORT_ID/download" -o /tmp/e2e-lesson.pptx
+python - <<'PY'
+from pathlib import Path
+from zipfile import ZipFile
+p=Path("/tmp/e2e-lesson.pptx")
+assert p.exists() and p.stat().st_size>5000, f"pptx missing or too small: {p.stat().st_size if p.exists() else 0}"
+assert p.read_bytes()[:2]==b"PK", "pptx is not a ZIP package"
+with ZipFile(p) as z:
+    names=set(z.namelist())
+    assert "[Content_Types].xml" in names
+    assert "ppt/presentation.xml" in names
+    slides=[n for n in names if n.startswith("ppt/slides/slide") and n.endswith(".xml")]
+    assert len(slides)>=15, f"pptx slide count too low: {len(slides)}"
+headers=Path("/tmp/e2e-pptx.headers").read_text(errors="ignore").lower()
+assert "content-disposition:" in headers and ".pptx" in headers, headers
+print("e2e-pptx-download-ok", p.stat().st_size, len(slides))
+PY
+
 curl -fsS -c "$COOKIE" -b "$COOKIE" -X DELETE "$API/projects/$PROJECT_ID" >/tmp/e2e-delete.json
 echo "e2e-lesson-plan-pipeline-ok"
