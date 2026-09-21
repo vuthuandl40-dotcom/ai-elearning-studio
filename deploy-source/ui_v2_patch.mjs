@@ -655,36 +655,46 @@ fs.writeFileSync(uploadGuardPath,uploadGuard);
 
 const createShellPath=path.join(root,"frontend/app/projects/new/page.tsx");
 let createShell=fs.readFileSync(createShellPath,"utf8");
+const createNL=String.fromCharCode(10);
 if(!createShell.includes('components/shell/TeacherHeader')){
-  createShell=createShell.replace('"use client";','"use client";\n\nimport TeacherHeader from "@/components/shell/TeacherHeader";\nimport TeacherNav from "@/components/shell/TeacherNav";');
-}
-const createHeaderStart=createShell.indexOf('<header className="border-b border-indigo-100 bg-white">');
-if(createHeaderStart>=0){const createHeaderEnd=createShell.indexOf("</header>",createHeaderStart);if(createHeaderEnd>=0)createShell=createShell.slice(0,createHeaderStart)+'<TeacherHeader title="Tạo bài giảng với AI"/>'+createShell.slice(createHeaderEnd+9);}
-if(!createShell.includes('<TeacherNav active="create"/>')){
-  createShell=createShell.replace('    <div className="mx-auto max-w-7xl p-4 md:p-7">','    <div className="flex"><TeacherNav active="create"/><div className="min-w-0 flex-1"><div className="mx-auto max-w-7xl p-4 md:p-7">');
-  const shellCloseMarker='    </div>\n    <style jsx global>';
-  const shellClose=createShell.lastIndexOf(shellCloseMarker);
-  if(shellClose>=0){createShell=createShell.slice(0,shellClose)+'    </div></div></div>\n    <style jsx global>'+createShell.slice(shellClose+shellCloseMarker.length);}
-}
-if(!createShell.includes("function acceptSourceFiles")){
   createShell=createShell.replace(
-    '  const watch = (label:string) => (job:BackgroundJob) => { setProgress(job); setBusy(label + " · " + job.status + " · " + job.progress + "%"); };',
-    `  const watch = (label:string) => (job:BackgroundJob) => { setProgress(job); setBusy(label + " · " + job.status + " · " + job.progress + "%"); };
-  function acceptSourceFiles(selected: File[]) {
-    const invalid=selected.find(file=>file.size>MAX_SOURCE_FILE_BYTES||!SOURCE_EXTENSIONS.some(ext=>file.name.toLowerCase().endsWith(ext)));
-    if(invalid){
-      setFiles([]);
-      setError(invalid.size>MAX_SOURCE_FILE_BYTES
-        ? "Tệp “"+invalid.name+"” vượt quá giới hạn "+MAX_SOURCE_FILE_MB+" MB."
-        : "Định dạng của “"+invalid.name+"” chưa được hỗ trợ. Hãy dùng PDF, DOCX, PPTX, TXT, PNG/JPG/WEBP.");
-      return;
-    }
-    setError("");
-    setFiles(selected);
-  }`
+    '"use client";',
+    '"use client";'+createNL+createNL+'import TeacherHeader from "@/components/shell/TeacherHeader";'+createNL+'import TeacherNav from "@/components/shell/TeacherNav";'
   );
 }
-createShell=createShell.replace(/onChange=\\{e=>\\{const selected=Array\\.from\\(e\\.target\\.files\\|\\|\\[\\]\\);[\\s\\S]*?setFiles\\(selected\\);\\}\\}/,'onChange={e=>{acceptSourceFiles(Array.from(e.target.files||[]));e.currentTarget.value="";}}');
-createShell=createShell.replace('<label className={"mt-5 block rounded-2xl border-2 border-dashed p-8 text-center transition " + (project?','<label onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();if(project)acceptSourceFiles(Array.from(e.dataTransfer.files));}} className={"mt-5 block rounded-2xl border-2 border-dashed p-8 text-center transition " + (project?');
-createShell=createShell.replace('{uploaded.includes(f.name)&&<span className="text-emerald-600">✓</span>}</div>)}</div>}','{uploaded.includes(f.name)?<span className="text-emerald-600">✓ Đã tải</span>:<button type="button" onClick={()=>setFiles(items=>items.filter(x=>x!==f))} className="rounded-lg border border-rose-100 bg-rose-50 px-2 py-1 text-[9px] font-black text-rose-600">Bỏ</button>}</div>)}</div>}');
+const createHeaderStart=createShell.indexOf('<header className="border-b border-indigo-100 bg-white">');
+if(createHeaderStart>=0){
+  const createHeaderEnd=createShell.indexOf("</header>",createHeaderStart);
+  if(createHeaderEnd>=0){
+    createShell=createShell.slice(0,createHeaderStart)+'<TeacherHeader title="Tạo bài giảng với AI"/>'+createShell.slice(createHeaderEnd+9);
+  }
+}
+if(!createShell.includes('<TeacherNav active="create"/>')){
+  createShell=createShell.replace(
+    '    <div className="mx-auto max-w-7xl p-4 md:p-7">',
+    '    <div className="flex"><TeacherNav active="create"/><div className="min-w-0 flex-1"><div className="mx-auto max-w-7xl p-4 md:p-7">'
+  );
+  const shellCloseMarker='    </div>'+createNL+'    <style jsx global>';
+  const shellClose=createShell.lastIndexOf(shellCloseMarker);
+  if(shellClose>=0){
+    createShell=createShell.slice(0,shellClose)+'    </div></div></div>'+createNL+'    <style jsx global>'+createShell.slice(shellClose+shellCloseMarker.length);
+  }
+}
+if(!createShell.includes("function acceptSourceFiles")){
+  const oldWatch='  const watch = (label:string) => (job:BackgroundJob) => { setProgress(job); setBusy(label + " · " + job.status + " · " + job.progress + "%"); };';
+  const sourceHelper='  function acceptSourceFiles(selected: File[]) { const invalid=selected.find(file=>file.size>MAX_SOURCE_FILE_BYTES||!SOURCE_EXTENSIONS.some(ext=>file.name.toLowerCase().endsWith(ext))); if(invalid){setFiles([]);setError(invalid.size>MAX_SOURCE_FILE_BYTES?"Tệp “"+invalid.name+"” vượt quá giới hạn "+MAX_SOURCE_FILE_MB+" MB.":"Định dạng của “"+invalid.name+"” chưa được hỗ trợ. Hãy dùng PDF, DOCX, PPTX, TXT, PNG/JPG/WEBP.");return;} setError(""); setFiles(selected); }';
+  createShell=createShell.replace(oldWatch,oldWatch+createNL+sourceHelper);
+}
+const oldChooser='onChange={e=>{const selected=Array.from(e.target.files||[]);const invalid=selected.find(file=>file.size>MAX_SOURCE_FILE_BYTES||!SOURCE_EXTENSIONS.some(ext=>file.name.toLowerCase().endsWith(ext)));if(invalid){setFiles([]);setError(invalid.size>MAX_SOURCE_FILE_BYTES?\`Tệp “\${invalid.name}” vượt quá giới hạn \${MAX_SOURCE_FILE_MB} MB.\`:\`Định dạng của “\${invalid.name}” chưa được hỗ trợ. Hãy dùng PDF, DOCX, PPTX, TXT, PNG/JPG/WEBP.\`);e.currentTarget.value="";return;}setError("");setFiles(selected);}}';
+if(createShell.includes(oldChooser)){
+  createShell=createShell.replace(oldChooser,'onChange={e=>{acceptSourceFiles(Array.from(e.target.files||[]));e.currentTarget.value="";}}');
+}
+createShell=createShell.replace(
+  '<label className={"mt-5 block rounded-2xl border-2 border-dashed p-8 text-center transition " + (project?',
+  '<label onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();if(project)acceptSourceFiles(Array.from(e.dataTransfer.files));}} className={"mt-5 block rounded-2xl border-2 border-dashed p-8 text-center transition " + (project?'
+);
+createShell=createShell.replace(
+  '{uploaded.includes(f.name)&&<span className="text-emerald-600">✓</span>}</div>)}</div>}',
+  '{uploaded.includes(f.name)?<span className="text-emerald-600">✓ Đã tải</span>:<button type="button" onClick={()=>setFiles(items=>items.filter(x=>x!==f))} className="rounded-lg border border-rose-100 bg-rose-50 px-2 py-1 text-[9px] font-black text-rose-600">Bỏ</button>}</div>)}</div>}'
+);
 fs.writeFileSync(createShellPath,createShell);
