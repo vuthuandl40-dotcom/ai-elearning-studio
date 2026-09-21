@@ -625,3 +625,30 @@ for(const token of ["downloadExport: async","credentials:\"include\"","URL.creat
   if(!uiApiCheck.includes(token)) throw new Error("Authenticated export download missing: "+token);
 }
 console.log("ui-v2-completeness-ok",requiredUiRoutes.length);
+
+
+const uploadGuardPath=path.join(root,"frontend/app/projects/new/page.tsx");
+let uploadGuard=fs.readFileSync(uploadGuardPath,"utf8");
+if(!uploadGuard.includes("const MAX_SOURCE_FILE_MB = 100")){
+  uploadGuard=uploadGuard.replace(
+    'type Stage = "info" | "files" | "analyze" | "plan" | "approve" | "generate" | "done";',
+    'type Stage = "info" | "files" | "analyze" | "plan" | "approve" | "generate" | "done";\n\nconst MAX_SOURCE_FILE_MB = 100;\nconst MAX_SOURCE_FILE_BYTES = MAX_SOURCE_FILE_MB * 1024 * 1024;\nconst SOURCE_EXTENSIONS = [".pdf",".docx",".pptx",".txt",".png",".jpg",".jpeg",".webp"];'
+  );
+  uploadGuard=uploadGuard.replace(
+    '    setError(""); setBusy("Đang tải tài liệu…");',
+    '    const invalid = files.find(file => file.size > MAX_SOURCE_FILE_BYTES || !SOURCE_EXTENSIONS.some(ext => file.name.toLowerCase().endsWith(ext)));\n    if (invalid) { setError(invalid.size > MAX_SOURCE_FILE_BYTES ? `Tệp “${invalid.name}” vượt quá giới hạn ${MAX_SOURCE_FILE_MB} MB.` : `Định dạng của “${invalid.name}” chưa được hỗ trợ. Hãy dùng PDF, DOCX, PPTX, TXT, PNG/JPG/WEBP.`); return; }\n    setError(""); setBusy("Đang tải tài liệu…");'
+  );
+  uploadGuard=uploadGuard.replace(
+    '        await api.uploadSourceFile(project.id, file);',
+    '        setBusy(`Đang tải “${file.name}” · ${(file.size/1024/1024).toFixed(1)} MB…`);\n        await api.uploadSourceFile(project.id, file);'
+  );
+  uploadGuard=uploadGuard.replace(
+    'accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.png,.jpg,.jpeg,.webp" onChange={e=>setFiles(Array.from(e.target.files||[]))}',
+    'accept=".pdf,.docx,.pptx,.txt,.png,.jpg,.jpeg,.webp" onChange={e=>{const selected=Array.from(e.target.files||[]);const invalid=selected.find(file=>file.size>MAX_SOURCE_FILE_BYTES||!SOURCE_EXTENSIONS.some(ext=>file.name.toLowerCase().endsWith(ext)));if(invalid){setFiles([]);setError(invalid.size>MAX_SOURCE_FILE_BYTES?`Tệp “${invalid.name}” vượt quá giới hạn ${MAX_SOURCE_FILE_MB} MB.`:`Định dạng của “${invalid.name}” chưa được hỗ trợ. Hãy dùng PDF, DOCX, PPTX, TXT, PNG/JPG/WEBP.`);e.currentTarget.value="";return;}setError("");setFiles(selected);}}'
+  );
+  uploadGuard=uploadGuard.replace(
+    'PDF, DOCX, PPTX, TXT, PNG/JPG</div>',
+    'PDF, DOCX, PPTX, TXT, PNG/JPG · tối đa 100 MB/tệp</div>'
+  );
+}
+fs.writeFileSync(uploadGuardPath,uploadGuard);
