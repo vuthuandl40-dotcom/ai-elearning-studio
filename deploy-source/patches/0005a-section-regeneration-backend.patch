@@ -213,11 +213,15 @@
 +    if instruction:
 +        specs = _instruction_specs(instruction)
 +        query = instruction + " " + " ".join(str(x.get("title") or "") for x in specs)
-+        matched = _rank_chunks(chunks, query, max(8, len(specs) * 4 if specs else 8))
++        original_ids = [str(x) for x in (section_plan.get("source_chunk_ids") or [])]
++        original_id_set = set(original_ids)
++        section_chunks = [chunk for chunk in chunks if str(chunk.id) in original_id_set]
++        matched = _rank_chunks(section_chunks or chunks, query, max(8, len(specs) * 4 if specs else 8))
 +        if project.source_policy == "strict" and not matched:
 +            raise GenerationError("Không tìm thấy nguồn phù hợp với yêu cầu tạo lại section trong chế độ Source: strict.")
 +        if matched:
-+            effective_section_plan["source_chunk_ids"] = [str(x.id) for x in matched]
++            matched_ids = [str(x.id) for x in matched]
++            effective_section_plan["source_chunk_ids"] = list(dict.fromkeys([*matched_ids, *original_ids]))
 +        if specs:
 +            effective_section_plan["slide_count_hint"] = len(specs)
 +            effective_section_plan["topic_titles"] = [str(x["title"]) for x in specs]
