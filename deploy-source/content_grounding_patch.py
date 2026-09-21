@@ -592,6 +592,10 @@ def require_job_access(db: Session, job_id: UUID, user: AppUser, *, write: bool 
     return _entity_access(db, BackgroundJob, job_id, user, write=write, detail="Job not found")
 
 
+def require_attempt_access(db: Session, attempt_id: UUID, user: AppUser, *, write: bool = False):
+    return _entity_access(db, LearnerAttempt, attempt_id, user, write=write, detail="Attempt not found")
+
+
 def require_export_access(db: Session, export_id: UUID, user: AppUser, *, write: bool = False):
     return _entity_access(db, ExportRun, export_id, user, write=write, detail="Export not found")
 
@@ -744,3 +748,75 @@ for _rel in [
     _secure_authoring_routes(_rel)
 
 print("project-child-route-security-patch-ok")
+
+
+# 14) Protect teacher/admin LMS, LRS, Visual and analytics report routes.
+def _secure_named_routes(rel_path: str, rules: list[tuple[str, str, str, bool]]) -> None:
+    p = root / rel_path
+    source = p.read_text()
+    helper_names = sorted({helper for _, helper, _, _ in rules})
+    source = _ensure_import_line(source, "from app.core.security import get_current_user")
+    source = _ensure_import_line(source, "from app.db.models import AppUser")
+    source = _ensure_import_line(
+        source,
+        "from app.core.project_access import " + ", ".join(helper_names),
+    )
+    for func_name, helper, var_name, write in rules:
+        source = _add_user_and_guard(
+            source,
+            func_name,
+            f"{helper}(db, {var_name}, user, write={write})",
+        )
+    p.write_text(source)
+
+
+_secure_named_routes(
+    "app/api/routes/lms.py",
+    [
+        ("get_lms_profile", "require_project_access", "project_id", False),
+        ("upsert_lms_profile", "require_project_access", "project_id", True),
+        ("xapi_template", "require_project_access", "project_id", False),
+        ("validate_exported_scorm", "require_export_access", "export_id", False),
+    ],
+)
+
+_secure_named_routes(
+    "app/api/routes/lrs.py",
+    [
+        ("get_connection", "require_project_access", "project_id", False),
+        ("save_connection", "require_project_access", "project_id", True),
+        ("test_lrs", "require_project_access", "project_id", True),
+        ("push_to_lrs", "require_attempt_access", "attempt_id", True),
+        ("list_deliveries", "require_project_access", "project_id", False),
+        ("sync_from_lrs", "require_project_access", "project_id", True),
+    ],
+)
+
+_secure_named_routes(
+    "app/api/routes/visual.py",
+    [
+        ("apply_project_theme", "require_project_access", "project_id", True),
+        ("apply_slide_theme", "require_slide_access", "slide_id", True),
+        ("apply_slide_layout", "require_slide_access", "slide_id", True),
+        ("list_media", "require_project_access", "project_id", False),
+        ("upload_media", "require_project_access", "project_id", True),
+        ("media_from_prompt", "require_slide_access", "slide_id", True),
+        ("attach_media", "require_slide_access", "slide_id", True),
+        ("delete_media", "require_media_access", "asset_id", True),
+        # media_content intentionally remains readable for lesson delivery.
+    ],
+)
+
+_secure_named_routes(
+    "app/api/routes/analytics.py",
+    [
+        ("analytics_summary", "require_project_access", "project_id", False),
+        ("analytics_learners", "require_project_access", "project_id", False),
+        ("analytics_objectives", "require_project_access", "project_id", False),
+        ("analytics_attempts", "require_project_access", "project_id", False),
+        ("analytics_attempt_detail", "require_attempt_access", "attempt_id", False),
+        # Tracking POST endpoints intentionally remain on the learner/SCORM path.
+    ],
+)
+
+print("teacher-tool-route-security-patch-ok")
