@@ -821,3 +821,20 @@ _secure_named_routes(
 )
 
 print("teacher-tool-route-security-patch-ok")
+
+
+# 15) Raise source upload limit for large PPTX/DOCX files used in real lesson plans.
+p=root/"app/core/config.py"
+s=p.read_text()
+s=s.replace("max_upload_mb: int = 50", "max_upload_mb: int = 100")
+p.write_text(s)
+
+p=root/"app/services/storage.py"
+s=p.read_text()
+s=s.replace(
+    'raise ValueError(f"File exceeds {settings.max_upload_mb} MB limit")',
+    'raise ValueError(f"Tệp vượt quá giới hạn {settings.max_upload_mb} MB")'
+)
+p.write_text(s)
+
+print("large-source-upload-limit-ok")
