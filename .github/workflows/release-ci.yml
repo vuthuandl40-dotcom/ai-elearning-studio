@@ -40,21 +40,6 @@ jobs:
           tar -xJf source.tar.xz -C src
           patch -d src -p1 < deploy-source/patches/0001-lesson-editor-null-project.patch
           python deploy-source/content_grounding_patch.py src
-      - name: Inspect PPTX upload pipeline
-        working-directory: src
-        run: |
-          echo "SETTINGS_BEGIN"
-          grep -RInE 'max.*upload|upload.*max|max.*file|file.*size|50.*MB|100.*MB|body.*limit|multipart' app frontend | head -n 300 || true
-          echo "SETTINGS_END"
-          echo "SOURCES_BEGIN"
-          sed -n '1,320p' app/api/routes/sources.py
-          echo "SOURCES_END"
-          echo "PARSERS_BEGIN"
-          sed -n '1,300p' app/services/source_analyzer/parsers.py
-          echo "PARSERS_END"
-          echo "STORAGE_BEGIN"
-          grep -RInE 'class .*Storage|def .*save|upload_file|write_bytes|shutil.copyfileobj|SpooledTemporaryFile' app | head -n 300 || true
-          echo "STORAGE_END"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -106,6 +91,7 @@ jobs:
           cat /tmp/health.json
           curl -fsS http://127.0.0.1:8000/ready
           bash deploy-source/test_e2e_lesson_pipeline.sh
+          bash deploy-source/test_large_pptx_upload.sh
           python deploy-source/test_project_access.py
           python deploy-source/test_teacher_tool_access.py
       - name: Runtime smoke frontend container
