@@ -40,14 +40,6 @@ jobs:
           tar -xJf source.tar.xz -C src
           patch -d src -p1 < deploy-source/patches/0001-lesson-editor-null-project.patch
           python deploy-source/content_grounding_patch.py src
-      - name: Inspect remaining project routes
-        working-directory: src
-        run: |
-          for f in app/api/routes/lms.py app/api/routes/lrs.py app/api/routes/visual.py app/api/routes/analytics.py; do
-            echo "FILE_BEGIN $f"
-            sed -n '1,260p' "$f"
-            echo "FILE_END $f"
-          done
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
