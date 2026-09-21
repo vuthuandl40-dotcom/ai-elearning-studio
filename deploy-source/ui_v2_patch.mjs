@@ -480,3 +480,30 @@ for(const rel of [
   x=x.replaceAll("api.latestGeneration(p.id)","api.latestGenerationQuality(p.id)");
   fs.writeFileSync(p,x);
 }
+
+
+const exportDownloadFixApiPath=path.join(root,"frontend/lib/api.ts");
+let exportDownloadFixApi=fs.readFileSync(exportDownloadFixApiPath,"utf8");
+if(!exportDownloadFixApi.includes("downloadExport: async")){
+  exportDownloadFixApi=exportDownloadFixApi.replace(
+    '  exportDownloadUrl: (run: ExportRun) => run.download_url ? `${API_URL.replace(/\\/api\\/v1\\/?$/, "")}${run.download_url}` : "",',
+    '  exportDownloadUrl: (run: ExportRun) => run.download_url ? `${API_URL.replace(/\\/api\\/v1\\/?$/, "")}${run.download_url}` : "",\n  downloadExport: async (run: ExportRun) => {\n    const url=run.download_url ? `${API_URL.replace(/\\/api\\/v1\\/?$/, "")}${run.download_url}` : "";\n    if(!url) throw new ApiError("File xuất chưa sẵn sàng để tải.",409);\n    let res=await fetch(url,{credentials:"include",cache:"no-store"});\n    if(res.status===401 && await refreshBrowserSession()) res=await fetch(url,{credentials:"include",cache:"no-store"});\n    if(!res.ok){ let detail:unknown; try{detail=await res.json()}catch{detail=await res.text()} throw new ApiError(typeof detail==="object"&&detail&&"detail" in detail?String((detail as {detail:unknown}).detail):`Không tải được file (HTTP ${res.status})`,res.status,detail); }\n    const blob=await res.blob(); if(!blob.size) throw new ApiError("File tải về rỗng.",500);\n    const objectUrl=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=objectUrl; a.download=run.file_name||"bai-giang"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(objectUrl),1500);\n    return {size:blob.size,file_name:run.file_name||"bai-giang"};\n  },'
+  );
+}
+fs.writeFileSync(exportDownloadFixApiPath,exportDownloadFixApi);
+
+const exportDownloadFixPagePath=path.join(root,"frontend/app/projects/[projectId]/export/page.tsx");
+let exportDownloadFixPage=fs.readFileSync(exportDownloadFixPagePath,"utf8");
+exportDownloadFixPage=exportDownloadFixPage.replace(
+  '      const url=api.exportDownloadUrl(run);\n      if(url) window.location.href=url;',
+  '      await api.downloadExport(run);'
+);
+exportDownloadFixPage=exportDownloadFixPage.replace(
+  '{rows.map((r,i)=>{const url=r.download_url?api.exportDownloadUrl(r as never):"";return <tr',
+  '{rows.map((r,i)=>{const downloadable=!!r.download_url;return <tr'
+);
+exportDownloadFixPage=exportDownloadFixPage.replace(
+  '{url?<button onClick={()=>location.href=url} className="rounded-lg bg-slate-900 px-3 py-1.5 text-[10px] font-black text-white">Tải lại</button>:<span className="text-[10px] text-slate-300">—</span>}',
+  '{downloadable?<button onClick={async()=>{setError("");try{await api.downloadExport(r as never);setNotice("Đã tải "+(r.file_name||"file xuất")+".")}catch(e){setError(e instanceof Error?e.message:"Không tải được file")}}} className="rounded-lg bg-slate-900 px-3 py-1.5 text-[10px] font-black text-white">Tải lại</button>:<span className="text-[10px] text-slate-300">—</span>}'
+);
+fs.writeFileSync(exportDownloadFixPagePath,exportDownloadFixPage);
