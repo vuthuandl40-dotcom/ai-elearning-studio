@@ -32,6 +32,8 @@ jobs:
       PGPASSWORD: elearning
     steps:
       - uses: actions/checkout@v4
+      - name: Check UI patch syntax
+        run: node --check deploy-source/ui_v2_patch.mjs
       - name: Reconstruct and verify source
         run: |
           cat deploy-source/source.b64.* | base64 -d > source.tar.xz
