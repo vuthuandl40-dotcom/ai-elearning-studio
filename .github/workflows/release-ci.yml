@@ -40,26 +40,6 @@ jobs:
           tar -xJf source.tar.xz -C src
           patch -d src -p1 < deploy-source/patches/0001-lesson-editor-null-project.patch
           python deploy-source/content_grounding_patch.py src
-      - name: Inspect export pipeline
-        working-directory: src
-        run: |
-          echo "EXPORT_ROUTE_BEGIN"
-          sed -n '1,360p' app/api/routes/exports.py
-          echo "EXPORT_ROUTE_END"
-          echo "EXPORT_FILES_BEGIN"
-          find app/services -maxdepth 4 -type f | grep -Ei 'export|pptx|powerpoint|blob' | sort
-          echo "EXPORT_FILES_END"
-          for f in $(find app/services -maxdepth 4 -type f | grep -Ei 'pptx|powerpoint|export_engine|blob_store' | sort); do
-            echo "SERVICE_FILE_BEGIN $f"
-            sed -n '1,360p' "$f"
-            echo "SERVICE_FILE_END $f"
-          done
-          echo "FRONTEND_EXPORT_BEGIN"
-          grep -R -n -E 'pptx|export|download|Tải|PowerPoint' frontend --exclude-dir=node_modules | head -n 500
-          echo "FRONTEND_EXPORT_END"
-          echo "API_EXPORT_BEGIN"
-          grep -n -A80 -B20 -E 'export|download' frontend/lib/api.ts
-          echo "API_EXPORT_END"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
