@@ -561,8 +561,8 @@ function addTeacherHeader(rel,title){
     if(x.includes('"use client";')) x=x.replace('"use client";','"use client";\\n\\nimport TeacherHeader from "@/components/shell/TeacherHeader";');
     else x='import TeacherHeader from "@/components/shell/TeacherHeader";\\n'+x;
   }
-  x=x.replace(/<header className="sticky top-0 z-40[\\s\\S]*?<\\/header>/,'<TeacherHeader title="'+title+'"/>');
-  x=x.replace(/<header className="sticky top-0 z-50[\\s\\S]*?<\\/header>/,'<TeacherHeader title="'+title+'"/>');
+  x=x.replace(new RegExp('<header className="sticky top-0 z-40[\\\\s\\\\S]*?</header>'),'<TeacherHeader title="'+title+'"/>');
+  x=x.replace(new RegExp('<header className="sticky top-0 z-50[\\\\s\\\\S]*?</header>'),'<TeacherHeader title="'+title+'"/>');
   fs.writeFileSync(p,x);
 }
 
