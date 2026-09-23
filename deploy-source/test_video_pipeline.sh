@@ -33,8 +33,13 @@ print("e2e-video-storyboard-ok",d["slide_count"],d["scene_count"],len(d["content
 PY
 
 payload='{"format":"mp4","include_notes":true,"include_sources":true,"include_quiz":true,"only_approved":false,"voice_enabled":false,"require_full_source_coverage":true,"scene_limit":2}'
-video_export=$(curl -fsS -c "$COOKIE" -b "$COOKIE" -H 'Content-Type: application/json' -d "$payload" "$API/projects/$PROJECT_ID/exports")
-printf '%s' "$video_export" >/tmp/e2e-video-export.json
+video_http=$(curl -sS -o /tmp/e2e-video-export.json -w '%{http_code}' -c "$COOKIE" -b "$COOKIE" -H 'Content-Type: application/json' -d "$payload" "$API/projects/$PROJECT_ID/exports")
+if [ "$video_http" != "201" ]; then
+  echo "mp4-export-http=$video_http"
+  cat /tmp/e2e-video-export.json
+  exit 1
+fi
+video_export=$(cat /tmp/e2e-video-export.json)
 VIDEO_EXPORT_ID=$(python - <<'PY'
 import json
 d=json.load(open("/tmp/e2e-video-export.json"))
