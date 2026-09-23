@@ -42,11 +42,6 @@ jobs:
           tar -xJf source.tar.xz -C src
           patch -d src -p1 < deploy-source/patches/0001-lesson-editor-null-project.patch
           python deploy-source/content_grounding_patch.py src
-      - name: Inspect slide writer
-        working-directory: src
-        run: |
-          sed -n '1,420p' app/services/lesson_writer/local_writer.py
-          sed -n '1,420p' frontend/components/editor/SlideCanvas.tsx
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
