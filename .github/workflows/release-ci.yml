@@ -42,6 +42,11 @@ jobs:
           tar -xJf source.tar.xz -C src
           patch -d src -p1 < deploy-source/patches/0001-lesson-editor-null-project.patch
           python deploy-source/content_grounding_patch.py src
+      - name: Inspect editor canvas files
+        working-directory: src
+        run: |
+          find frontend/components/editor -maxdepth 2 -type f -print | sort
+          sed -n '1,320p' frontend/components/editor/LessonEditor.tsx
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
