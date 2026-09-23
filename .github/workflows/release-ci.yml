@@ -42,34 +42,6 @@ jobs:
           tar -xJf source.tar.xz -C src
           patch -d src -p1 < deploy-source/patches/0001-lesson-editor-null-project.patch
           python deploy-source/content_grounding_patch.py src
-      - name: Inspect video export integration
-        working-directory: src
-        run: |
-          echo "EXPORT_ROUTE_BEGIN"
-          sed -n '1,360p' app/api/routes/exports.py
-          echo "EXPORT_ROUTE_END"
-          echo "EXPORT_FILES_BEGIN"
-          find app -maxdepth 4 -type f | grep -E 'export|render|media|video' | sort
-          echo "EXPORT_FILES_END"
-          echo "REQUIREMENTS_BEGIN"
-          cat requirements.txt
-          echo "REQUIREMENTS_END"
-          echo "SLIDE_TYPES_BEGIN"
-          sed -n '1,280p' app/services/lesson_writer/types.py
-          echo "SLIDE_TYPES_END"
-      - name: Inspect export engine
-        working-directory: src
-        run: |
-          echo "SCHEMA_EXPORT"
-          cat app/schemas/export.py
-          echo "EXPORT_SERVICE"
-          cat app/services/export_engine/service.py
-          echo "EXPORT_TYPES"
-          cat app/services/export_engine/types.py
-          echo "EXPORT_ASSEMBLER"
-          sed -n '1,360p' app/services/export_engine/assembler.py
-          echo "BLOB_STORE"
-          sed -n '1,320p' app/services/blob_store.py
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -107,6 +79,12 @@ jobs:
         run: docker run --rm --entrypoint python ai-elearning-api:ci -c "from types import SimpleNamespace as S; from app.services.lesson_writer.v2 import enrich_section_v2; mk=lambda k,t:S(section_key=k,slides=[S(title=\"Smoke\",onscreen_text=[t,\"Thông tin bổ sung từ học liệu giúp người học hiểu rõ nội dung trọng tâm của bài học\"],source_refs=[],interaction=None,teacher_script=\"\",student_instruction=\"\",guiding_question=\"\",metadata={})],warnings=[]); r2=enrich_section_v2(mk(\"interaction_2\",\"Kiến thức quan trọng giúp học sinh ghi nhớ nội dung\"),plan_section={\"section_key\":\"interaction_2\",\"source_chunk_ids\":[]},chunks_by_id={},project=S()); r3=enrich_section_v2(mk(\"interaction_3\",\"Nội dung trọng tâm thứ nhất được dùng để giải thích rõ vấn đề đang học\"),plan_section={\"section_key\":\"interaction_3\",\"source_chunk_ids\":[]},chunks_by_id={},project=S()); rp=enrich_section_v2(mk(\"practice\",\"Kiến thức luyện tập được vận dụng để giải quyết nhiệm vụ cụ thể trong bài học\"),plan_section={\"section_key\":\"practice\",\"source_chunk_ids\":[]},chunks_by_id={},project=S()); assert r2.slides[0].interaction.interaction_type in {\"fill_blank\",\"true_false\"}; assert r3.slides[0].interaction.interaction_type==\"single_choice\"; assert rp.slides[0].interaction.interaction_type==\"matching\"; assert isinstance(rp.slides[0].interaction.correct_answer,dict) and len(rp.slides[0].interaction.correct_answer)>=2; print(\"v2-interaction-regression-smoke-ok\")"
       - name: Docker build frontend
         run: docker build --build-arg NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL" -f Dockerfile.frontend -t ai-elearning-frontend:ci .
+      - name: Ensure ffprobe for MP4 smoke
+        run: |
+          if ! command -v ffprobe >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
       - name: Runtime smoke API container
         run: |
           docker run -d --name api-smoke --network host \
