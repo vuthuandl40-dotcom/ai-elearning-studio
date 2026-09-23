@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-API="http://127.0.0.1:8000/api/v1"
+API="${API:-http://127.0.0.1:8000/api/v1}"
 COOKIE="/tmp/large-pptx-cookie.txt"
 PPTX="/tmp/large-lesson.pptx"
-EMAIL="large-pptx-${GITHUB_RUN_ID:-local}@example.com"
+TEST_VARIANT="${TEST_VARIANT:-direct}"
+EMAIL="large-pptx-${TEST_VARIANT}-${GITHUB_RUN_ID:-local}@example.com"
 PASSWORD="LargePptxPass123!"
 
 python - <<'PY'
