@@ -57,6 +57,19 @@ jobs:
           echo "SLIDE_TYPES_BEGIN"
           sed -n '1,280p' app/services/lesson_writer/types.py
           echo "SLIDE_TYPES_END"
+      - name: Inspect export engine
+        working-directory: src
+        run: |
+          echo "SCHEMA_EXPORT"
+          cat app/schemas/export.py
+          echo "EXPORT_SERVICE"
+          cat app/services/export_engine/service.py
+          echo "EXPORT_TYPES"
+          cat app/services/export_engine/types.py
+          echo "EXPORT_ASSEMBLER"
+          sed -n '1,360p' app/services/export_engine/assembler.py
+          echo "BLOB_STORE"
+          sed -n '1,320p' app/services/blob_store.py
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
