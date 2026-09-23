@@ -42,32 +42,6 @@ jobs:
           tar -xJf source.tar.xz -C src
           patch -d src -p1 < deploy-source/patches/0001-lesson-editor-null-project.patch
           python deploy-source/content_grounding_patch.py src
-      - name: Inspect editor canvas files
-        working-directory: src
-        run: |
-          find frontend/components/editor -maxdepth 2 -type f -print | sort
-          sed -n '1,320p' frontend/components/editor/LessonEditor.tsx
-      - name: Inspect export schema
-        working-directory: src
-        run: |
-          sed -n '1,220p' app/schemas/export.py
-          sed -n '1,260p' app/api/routes/exports.py
-      - name: Inspect map-focus assignment
-        working-directory: src
-        run: |
-          grep -RIn "map-focus" app frontend || true
-          grep -RInE "recommended.*layout|choose.*layout|layout.*visual|visual.*layout|design_json" app/services frontend | head -n 320 || true
-      - name: Inspect slide layout persistence
-        working-directory: src
-        run: |
-          sed -n '40,280p' app/services/lesson_writer/local_writer.py
-          sed -n '80,340p' app/services/lesson_writer/service.py
-          sed -n '1,220p' app/services/lesson_writer/types.py
-          sed -n '1,220p' frontend/components/editor/SlideStage.tsx
-      - name: Inspect layout assignment
-        working-directory: src
-        run: |
-          grep -RInE 'map-focus|cinematic-hero|question-spotlight|layout_key|layout =' app frontend | head -n 500 || true
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
