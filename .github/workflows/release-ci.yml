@@ -99,7 +99,7 @@ jobs:
           python deploy-source/test_teacher_tool_access.py
       - name: Runtime smoke frontend container
         run: |
-          docker run -d --name frontend-smoke --network host -e PORT=3000 ai-elearning-frontend:ci
+          docker run -d --name frontend-smoke --network host --add-host api.railway.internal:127.0.0.1 -e PORT=3000 ai-elearning-frontend:ci
           for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:3000/login >/tmp/login.html; then break; fi
             sleep 2
@@ -112,6 +112,7 @@ jobs:
           test -s /tmp/library.html
           test -s /tmp/students.html
           test -s /tmp/reports.html
+          API="http://127.0.0.1:3000/api/v1" TEST_VARIANT=proxy bash deploy-source/test_large_pptx_upload.sh
       - name: Runtime logs on failure
         if: failure()
         run: |
