@@ -381,6 +381,13 @@ new='''    rows = _section_chunks(section_plan, chunks_by_id)
                 chunks=rows,
                 teacher_profile=teacher_profile,
             )
+            from app.services.lesson_writer.v2 import enrich_section_v2
+            candidate = enrich_section_v2(
+                candidate,
+                plan_section=section_plan,
+                chunks_by_id=chunks_by_id,
+                project=project,
+            )
             candidate = validate_and_repair_section(
                 candidate,
                 plan_section=section_plan,
@@ -399,6 +406,13 @@ new='''    rows = _section_chunks(section_plan, chunks_by_id)
             if not fallback_to_local:
                 raise
             local = build_local_section_draft(project, section_plan, chunks_by_id, objectives, teacher_profile)
+            from app.services.lesson_writer.v2 import enrich_section_v2
+            local = enrich_section_v2(
+                local,
+                plan_section=section_plan,
+                chunks_by_id=chunks_by_id,
+                project=project,
+            )
             local = validate_and_repair_section(
                 local,
                 plan_section=section_plan,
@@ -411,6 +425,13 @@ new='''    rows = _section_chunks(section_plan, chunks_by_id)
             return local
 
     local = build_local_section_draft(project, section_plan, chunks_by_id, objectives, teacher_profile)
+    from app.services.lesson_writer.v2 import enrich_section_v2
+    local = enrich_section_v2(
+        local,
+        plan_section=section_plan,
+        chunks_by_id=chunks_by_id,
+        project=project,
+    )
     return validate_and_repair_section(
         local,
         plan_section=section_plan,
