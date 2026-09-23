@@ -1108,3 +1108,365 @@ def video_storyboard(project_id: UUID, db: Session = Depends(get_db), user: AppU
 p.write_text(s)
 
 print("video-storyboard-and-crosswalk-ok")
+
+
+# 17) Full-HD MP4 video export renderer with source gate and Vietnamese neural narration.
+p=root/"requirements.txt"
+s=p.read_text()
+if "edge-tts" not in s:
+    s += "\nedge-tts>=7.2\n"
+p.write_text(s)
+
+p=root/"app/schemas/export.py"
+s=p.read_text()
+s=s.replace(
+    'ExportFormat = Literal["pptx", "pdf", "html5", "scorm12", "scorm2004"]',
+    'ExportFormat = Literal["pptx", "pdf", "html5", "scorm12", "scorm2004", "mp4"]',
+)
+if "voice_enabled:" not in s:
+    s=s.replace(
+        "    only_approved: bool = False\n",
+        '    only_approved: bool = False\n    voice_enabled: bool = True\n    voice_name: str = "vi-VN-HoaiMyNeural"\n    voice_rate: str = "+0%"\n    require_full_source_coverage: bool = True\n'
+    )
+p.write_text(s)
+
+video_renderer=root/"app/services/export_engine/video_renderer.py"
+video_renderer.write_text(r'''from __future__ import annotations
+
+import asyncio
+import math
+import shutil
+import subprocess
+import textwrap
+from pathlib import Path
+from typing import Any
+
+from PIL import Image, ImageDraw, ImageFont, ImageOps
+
+from app.services.export_engine.assembler import assemble_deck
+from app.services.video_lesson import build_video_storyboard
+
+WIDTH=1920
+HEIGHT=1080
+FPS=30
+BG=(245,247,252)
+INK=(15,23,42)
+MUTED=(71,85,105)
+INDIGO=(79,70,229)
+VIOLET=(124,58,237)
+EMERALD=(5,150,105)
+BORDER=(224,231,255)
+
+
+def _run(args:list[str]) -> None:
+    proc=subprocess.run(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+    if proc.returncode:
+        raise RuntimeError((proc.stderr or proc.stdout or "ffmpeg failed")[-5000:])
+
+
+def _font(size:int,bold:bool=False):
+    names=[
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+    ]
+    for name in names:
+        if Path(name).exists():
+            return ImageFont.truetype(name,size=size)
+    return ImageFont.load_default()
+
+
+def _wrap(text:str,font,max_width:int)->list[str]:
+    words=(text or "").split()
+    if not words:
+        return []
+    lines=[]
+    current=""
+    for word in words:
+        candidate=(current+" "+word).strip()
+        box=font.getbbox(candidate)
+        if box[2]-box[0] <= max_width or not current:
+            current=candidate
+        else:
+            lines.append(current);current=word
+    if current:
+        lines.append(current)
+    return lines
+
+
+def _rounded(draw,xy,radius,fill,outline=None,width=1):
+    draw.rounded_rectangle(xy,radius=radius,fill=fill,outline=outline,width=width)
+
+
+def _draw_lines(draw,lines,x,y,font,fill,line_gap=12,max_lines=None):
+    if max_lines:
+        lines=lines[:max_lines]
+    cy=y
+    for line in lines:
+        draw.text((x,cy),line,font=font,fill=fill)
+        cy += font.size + line_gap
+    return cy
+
+
+def _load_visual(path:Path|None,box:tuple[int,int,int,int])->Image.Image|None:
+    if not path or not path.exists():
+        return None
+    try:
+        if path.suffix.lower() in {".png",".jpg",".jpeg",".webp",".bmp"}:
+            im=Image.open(path).convert("RGB")
+            return ImageOps.fit(im,(box[2]-box[0],box[3]-box[1]),method=Image.Resampling.LANCZOS)
+    except Exception:
+        return None
+    return None
+
+
+def _draw_header(draw,title,section,scene_no):
+    draw.text((72,52),section.upper(),font=_font(23,True),fill=INDIGO)
+    title_lines=_wrap(title,_font(48,True),1180)
+    _draw_lines(draw,title_lines,72,95,_font(48,True),INK,10,2)
+    _rounded(draw,(1650,54,1848,112),20,(238,242,255))
+    draw.text((1690,70),f"CẢNH {scene_no}",font=_font(20,True),fill=INDIGO)
+
+
+def _draw_footer(draw,source_verified:bool,layout:str):
+    draw.line((72,1010,1848,1010),fill=(226,232,240),width=2)
+    draw.text((72,1028),"AI E-Learning Studio · Video bài giảng",font=_font(18),fill=(100,116,139))
+    status="✓ Đã đối chiếu nguồn" if source_verified else "• Cảnh chuyển tiếp"
+    draw.text((1460,1028),status,font=_font(18,True),fill=EMERALD if source_verified else MUTED)
+
+
+def _render_scene_frame(scene:dict[str,Any],media_path:Path|None,target:Path)->None:
+    img=Image.new("RGB",(WIDTH,HEIGHT),BG)
+    draw=ImageDraw.Draw(img)
+    layout=str(scene.get("visual",{}).get("layout") or "center-focus")
+    _draw_header(draw,scene.get("title") or "",scene.get("scene_role") or "",scene.get("scene_number") or 0)
+    items=[str(x) for x in scene.get("onscreen_text") or []]
+    question=str(scene.get("question") or "").strip()
+    visual=_load_visual(media_path,(1000,230,1810,880))
+
+    if layout in {"cinematic-hero","question-spotlight","scenario-stage","center-focus"}:
+        _rounded(draw,(72,245,1848,900),36,(255,255,255),BORDER,2)
+        if visual:
+            img.paste(visual,(1000,245))
+            text_width=820
+        else:
+            text_width=1580
+        y=315
+        for idx,item in enumerate(items[:4]):
+            _rounded(draw,(120,y-10,120+text_width,y+105),22,(248,250,255))
+            draw.text((145,y+10),str(idx+1).zfill(2),font=_font(22,True),fill=VIOLET)
+            lines=_wrap(item,_font(30,True if idx==0 else False),text_width-100)
+            _draw_lines(draw,lines,205,y+5,_font(30,True if idx==0 else False),INK,8,2)
+            y+=135
+    elif layout in {"comparison-2-column","evidence-board","milestone-checklist","takeaway-cards"}:
+        cols=2
+        cards=items[:4] or [scene.get("title") or ""]
+        cw=820;ch=245
+        for i,item in enumerate(cards):
+            col=i%cols;row=i//cols
+            x=100+col*870;y=250+row*285
+            _rounded(draw,(x,y,x+cw,y+ch),28,(255,255,255),BORDER,2)
+            draw.text((x+30,y+26),str(i+1),font=_font(28,True),fill=INDIGO)
+            lines=_wrap(item,_font(29,True if i<2 else False),cw-100)
+            _draw_lines(draw,lines,x+82,y+22,_font(29,True if i<2 else False),INK,9,5)
+    elif layout in {"process-timeline","cause-effect","sequence-workspace"}:
+        steps=items[:5] or [scene.get("title") or ""]
+        n=max(1,len(steps));gap=28;available=1700-(n-1)*gap;cw=max(240,available//n)
+        y=400
+        for i,item in enumerate(steps):
+            x=110+i*(cw+gap)
+            _rounded(draw,(x,y,x+cw,y+300),28,(255,255,255),BORDER,2)
+            _rounded(draw,(x+24,y-38,x+86,y+24),22,INDIGO)
+            draw.text((x+45,y-27),str(i+1),font=_font(22,True),fill=(255,255,255))
+            lines=_wrap(item,_font(25),cw-54)
+            _draw_lines(draw,lines,x+28,y+55,_font(25),INK,8,7)
+            if i<n-1:
+                draw.line((x+cw,y+150,x+cw+gap,y+150),fill=VIOLET,width=6)
+    elif layout in {"annotated-visual","split-visual-explain","zoom-detail","text-left-visual-right","visual-left-text-right","full-bleed-annotated"}:
+        left_visual=layout in {"annotated-visual","split-visual-explain","visual-left-text-right","full-bleed-annotated"}
+        visual_box=(85,240,955,900) if left_visual else (965,240,1835,900)
+        text_box=(990,240,1835,900) if left_visual else (85,240,930,900)
+        _rounded(draw,visual_box,30,(229,231,255),BORDER,2)
+        if visual:
+            fitted=_load_visual(media_path,visual_box)
+            if fitted:
+                img.paste(fitted,(visual_box[0],visual_box[1]))
+        else:
+            cx=(visual_box[0]+visual_box[2])//2;cy=(visual_box[1]+visual_box[3])//2
+            draw.ellipse((cx-115,cy-115,cx+115,cy+115),fill=(224,231,255))
+            draw.text((cx-58,cy-35),"VISUAL",font=_font(28,True),fill=INDIGO)
+        y=text_box[1]+20
+        for i,item in enumerate(items[:5]):
+            _rounded(draw,(text_box[0],y,text_box[2],y+105),18,(255,255,255),BORDER,1)
+            draw.text((text_box[0]+24,y+18),"•",font=_font(30,True),fill=VIOLET)
+            lines=_wrap(item,_font(27),text_box[2]-text_box[0]-90)
+            _draw_lines(draw,lines,text_box[0]+60,y+16,_font(27),INK,8,3)
+            y+=122
+    elif layout in {"concept-map","matching-workspace","activity-board","quiz-card","fill-blank-focus","evidence-choice","real-world-scenario"}:
+        center_x=960;center_y=505
+        _rounded(draw,(690,410,1230,600),35,(238,242,255),INDIGO,3)
+        center_lines=_wrap(scene.get("title") or "",_font(31,True),470)
+        _draw_lines(draw,center_lines,735,455,_font(31,True),INK,8,3)
+        cards=items[:4]
+        anchors=[(110,270),(1290,270),(110,690),(1290,690)]
+        for i,item in enumerate(cards):
+            x,y=anchors[i]
+            _rounded(draw,(x,y,x+520,y+210),25,(255,255,255),BORDER,2)
+            lines=_wrap(item,_font(25),460)
+            _draw_lines(draw,lines,x+30,y+35,_font(25),INK,8,5)
+            draw.line((x+260 if x<900 else x,y+105,center_x,center_y),fill=(196,181,253),width=4)
+    else:
+        _rounded(draw,(90,245,1830,900),30,(255,255,255),BORDER,2)
+        y=310
+        for item in items[:6]:
+            lines=_wrap(item,_font(32),1580)
+            y=_draw_lines(draw,lines,150,y,_font(32),INK,10,3)+24
+
+    if question:
+        _rounded(draw,(155,905,1765,985),22,(245,243,255),(196,181,253),2)
+        qlines=_wrap("? "+question,_font(23,True),1510)
+        _draw_lines(draw,qlines,190,925,_font(23,True),VIOLET,6,2)
+    _draw_footer(draw,bool(scene.get("source_verified")),layout)
+    img.save(target,quality=95)
+
+
+def _probe_duration(path:Path)->float:
+    proc=subprocess.run([
+        "ffprobe","-v","error","-show_entries","format=duration",
+        "-of","default=noprint_wrappers=1:nokey=1",str(path)
+    ],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+    if proc.returncode:
+        return 0.0
+    try:return float(proc.stdout.strip())
+    except Exception:return 0.0
+
+
+async def _tts(text:str,target:Path,voice_name:str,rate:str)->None:
+    import edge_tts
+    communicate=edge_tts.Communicate(text=text,voice=voice_name,rate=rate)
+    await communicate.save(str(target))
+
+
+def _create_audio(text:str,target:Path,voice_name:str,rate:str)->None:
+    if not text.strip():
+        text="Tiếp tục bài học."
+    try:
+        asyncio.run(_tts(text,target,voice_name,rate))
+    except Exception as exc:
+        raise RuntimeError(f"Không tạo được giọng đọc tiếng Việt ({voice_name}): {exc}") from exc
+    if not target.exists() or target.stat().st_size < 1000:
+        raise RuntimeError("Dịch vụ giọng đọc trả về tệp âm thanh rỗng.")
+
+
+def render_mp4(
+    db,
+    project_id,
+    target:Path,
+    *,
+    voice_enabled:bool=True,
+    voice_name:str="vi-VN-HoaiMyNeural",
+    voice_rate:str="+0%",
+    require_full_source_coverage:bool=True,
+)->list[str]:
+    if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+        raise RuntimeError("Máy chủ chưa có ffmpeg/ffprobe để xuất MP4.")
+
+    storyboard=build_video_storyboard(db,project_id)
+    if require_full_source_coverage and not storyboard["ready_for_render"]:
+        raise RuntimeError(
+            "Chưa thể xuất video: bài giảng chưa đạt kiểm tra đối chiếu nguồn 100%. "
+            + " ".join(storyboard.get("warnings") or [])
+        )
+    deck=assemble_deck(db,project_id,only_approved=False)
+    slide_media={slide.id:[m for m in slide.media if m.path] for slide in deck.slides}
+
+    work=target.parent/"video_work"
+    if work.exists():shutil.rmtree(work)
+    work.mkdir(parents=True,exist_ok=True)
+    clips=[]
+    warnings=[]
+    for scene in storyboard["scenes"]:
+        idx=int(scene["scene_number"])
+        frame=work/f"scene-{idx:03d}.png"
+        audio=work/f"scene-{idx:03d}.mp3"
+        clip=work/f"scene-{idx:03d}.mp4"
+        media_list=slide_media.get(str(scene["source_slide_id"]),[])
+        media_path=media_list[0].path if media_list else None
+        _render_scene_frame(scene,media_path,frame)
+
+        narration=str(scene.get("narration") or "").strip()
+        if voice_enabled:
+            _create_audio(narration,audio,voice_name,voice_rate)
+            audio_duration=_probe_duration(audio)
+            duration=max(float(scene.get("duration_seconds") or 8),audio_duration+float(scene.get("pause_after_question_seconds") or 0)+0.5)
+            audio_args=["-i",str(audio)]
+            audio_map=["-map","1:a:0","-af",f"apad=pad_dur={max(1.0,duration-audio_duration):.2f}"]
+        else:
+            duration=max(5.0,float(scene.get("duration_seconds") or 8))
+            audio_args=["-f","lavfi","-i","anullsrc=channel_layout=stereo:sample_rate=44100"]
+            audio_map=["-map","1:a:0"]
+
+        frames=max(1,math.ceil(duration*FPS))
+        vf=(
+            f"scale={WIDTH}:{HEIGHT},"
+            f"zoompan=z='min(zoom+0.00018,1.025)':"
+            f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
+            f"d={frames}:s={WIDTH}x{HEIGHT}:fps={FPS},format=yuv420p"
+        )
+        cmd=[
+            "ffmpeg","-y","-loop","1","-i",str(frame),*audio_args,
+            "-filter:v",vf,"-map","0:v:0",*audio_map,
+            "-t",f"{duration:.3f}","-r",str(FPS),
+            "-c:v","libx264","-preset","veryfast","-crf","20",
+            "-c:a","aac","-b:a","160k","-ar","44100","-ac","2",
+            "-movflags","+faststart",str(clip)
+        ]
+        _run(cmd)
+        clips.append(clip)
+
+    concat=work/"concat.txt"
+    concat.write_text("\n".join("file '"+str(x).replace("'","'\\''")+"'" for x in clips)+"\n")
+    _run([
+        "ffmpeg","-y","-f","concat","-safe","0","-i",str(concat),
+        "-c:v","libx264","-preset","medium","-crf","19",
+        "-c:a","aac","-b:a","160k","-movflags","+faststart",str(target)
+    ])
+    if not target.exists() or target.stat().st_size < 10000:
+        raise RuntimeError("MP4 renderer không tạo được tệp video hợp lệ.")
+    if not voice_enabled:
+        warnings.append("MP4 được render ở chế độ kiểm thử không TTS; production mặc định bật giọng đọc tiếng Việt.")
+    if storyboard.get("warnings"):
+        warnings.extend(storyboard["warnings"])
+    shutil.rmtree(work,ignore_errors=True)
+    return warnings
+''')
+
+p=root/"app/services/export_engine/service.py"
+s=p.read_text()
+if "video_renderer import render_mp4" not in s:
+    s=s.replace(
+        "from app.services.export_engine.pptx_renderer import render_pptx",
+        "from app.services.export_engine.pptx_renderer import render_pptx\nfrom app.services.export_engine.video_renderer import render_mp4",
+    )
+if 'elif run.format == "mp4":' not in s:
+    marker='''        elif run.format == "html5":
+'''
+    branch='''        elif run.format == "mp4":
+            safe_video_stem = re.sub(r'[\\/:*?"<>|]+', "_", deck.title).strip(" ._") or "Bai_Giang"
+            target = out_dir / f"{safe_video_stem}_Video_Bai_Giang.mp4"
+            options = run.options or {}
+            warnings.extend(render_mp4(
+                db,
+                run.project_id,
+                target,
+                voice_enabled=bool(options.get("voice_enabled", True)),
+                voice_name=str(options.get("voice_name") or "vi-VN-HoaiMyNeural"),
+                voice_rate=str(options.get("voice_rate") or "+0%"),
+                require_full_source_coverage=bool(options.get("require_full_source_coverage", True)),
+            ))
+            mime = "video/mp4"
+'''
+    if marker not in s:raise RuntimeError("html5 export marker missing")
+    s=s.replace(marker,branch+marker)
+p.write_text(s)
+
+print("fullhd-mp4-export-renderer-ok")
