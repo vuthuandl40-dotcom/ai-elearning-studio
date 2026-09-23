@@ -138,3 +138,19 @@ assert _map_layouts.count("map-focus") <= 2, _map_layouts
 _non_map=_design_profile("explore_1",0,"map","Vòng tuần hoàn của nước",["Nước bay hơi và ngưng tụ"])
 assert _non_map["layout"]!="map-focus", _non_map
 print("semantic-map-diversity-regression-ok",_map_layouts)
+
+
+_interaction_map=_design_profile("interaction_1",0,"map","Xác định vị trí trên bản đồ",["Quan sát bản đồ và chọn đáp án"])
+assert _interaction_map["layout"]=="quiz-card", _interaction_map
+_practice_map=_design_profile("practice",1,"map","Luyện tập bản đồ",["Ghép vị trí với mô tả"])
+assert _practice_map["layout"]=="matching-workspace", _practice_map
+_application_map=_design_profile("application",0,"map","Vận dụng bản đồ",["Giải quyết tình huống thực tế"])
+assert _application_map["layout"]=="real-world-scenario", _application_map
+_geo_family=[
+    _design_profile("explore_1",0,"map","Kinh tuyến và vĩ tuyến",["Xác định vị trí trên bản đồ"]),
+    _design_profile("explore_1",1,"map","Kinh tuyến và vĩ tuyến",["Xác định vị trí trên bản đồ"]),
+    _design_profile("explore_2",0,"map","Kinh tuyến và vĩ tuyến",["Xác định vị trí trên bản đồ"]),
+    _design_profile("explore_3",0,"map","Kinh tuyến và vĩ tuyến",["Xác định vị trí trên bản đồ"]),
+]
+assert len({x["layout"] for x in _geo_family})>=3, _geo_family
+print("interaction-role-layout-precedence-ok", [x["layout"] for x in _geo_family])
