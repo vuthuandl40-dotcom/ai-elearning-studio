@@ -103,3 +103,22 @@ assert _ai_enrich < _ai_validate, "AI writer validation occurs before V2 interac
 assert _local_enrich < _local_validate, "Local fallback validation occurs before V2 interaction enrichment"
 assert "interaction_2" not in _build_body or _ai_enrich < _ai_validate
 print("writer-enrich-before-validate-regression-ok")
+
+
+from app.services.lesson_writer.v2 import _design_profile
+
+_sections=[
+    "introduction","objectives","warmup","lead_in",
+    "explore_1","interaction_1","explore_2","interaction_2",
+    "explore_3","interaction_3","practice","application","summary","closing",
+]
+_profiles=[_design_profile(key,0,"",key) for key in _sections]
+_layouts={p["layout"] for p in _profiles}
+_visuals={p["visual"] for p in _profiles}
+assert len(_layouts)>=12, _layouts
+assert len(_visuals)>=9, _visuals
+_explore_layouts={_design_profile("explore_1",i,"","Khám phá")["layout"] for i in range(3)}
+assert len(_explore_layouts)==3, _explore_layouts
+_practice_layouts={_design_profile("practice",i,"","Luyện tập")["layout"] for i in range(3)}
+assert len(_practice_layouts)==3, _practice_layouts
+print("slide-layout-diversity-regression-ok",len(_layouts),len(_visuals))
