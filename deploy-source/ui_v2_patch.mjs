@@ -698,3 +698,78 @@ createShell=createShell.replace(
   '{uploaded.includes(f.name)?<span className="text-emerald-600">✓ Đã tải</span>:<button type="button" onClick={()=>setFiles(items=>items.filter(x=>x!==f))} className="rounded-lg border border-rose-100 bg-rose-50 px-2 py-1 text-[9px] font-black text-rose-600">Bỏ</button>}</div>)}</div>}'
 );
 fs.writeFileSync(createShellPath,createShell);
+
+
+const videoStoryboardApiPath=path.join(root,"frontend/lib/api.ts");
+let videoStoryboardApi=fs.readFileSync(videoStoryboardApiPath,"utf8");
+if(!videoStoryboardApi.includes("videoStoryboard:")){
+  videoStoryboardApi=videoStoryboardApi.replace(
+    '  latestPlan: (projectId: string) => request<PlanningRun>(`/projects/${projectId}/plan/latest`),',
+    '  latestPlan: (projectId: string) => request<PlanningRun>(`/projects/${projectId}/plan/latest`),\n  videoStoryboard: (projectId: string) => request<any>(`/projects/${projectId}/video/storyboard`),'
+  );
+}
+fs.writeFileSync(videoStoryboardApiPath,videoStoryboardApi);
+
+const videoPageDir=path.join(root,"frontend/app/projects/[projectId]/video");
+fs.mkdirSync(videoPageDir,{recursive:true});
+fs.writeFileSync(path.join(videoPageDir,"page.tsx"), `"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
+import { api } from "@/lib/api";
+
+type Storyboard = {
+  title:string; language:string; source_coverage_pct:number; source_chunk_count:number;
+  used_source_chunk_count:number; slide_count:number; scene_count:number; estimated_duration_seconds:number;
+  ready_for_render:boolean; warnings:string[];
+  quality_checks:Record<string,boolean>;
+  content_crosswalk:Array<{kind:string;content:string;source_document?:string;heading?:string;source_slide_order:number;scene_ids:string[];kept:boolean}>;
+  scenes:Array<{scene_id:string;scene_number:number;source_slide_order:number;section_title:string;scene_role:string;title:string;onscreen_text:string[];narration:string;student_activity?:string;question?:string;pause_after_question_seconds:number;duration_seconds:number;visual:{layout:string;theme:string;media:any[]};sources:any[];source_verified:boolean}>;
+};
+
+function fmtTime(seconds:number){const m=Math.floor(seconds/60);const s=seconds%60;return m+" phút "+s+" giây";}
+
+export default function VideoStoryboardPage(){
+  const params=useParams<{projectId:string}>();
+  const [data,setData]=useState<Storyboard|null>(null);
+  const [error,setError]=useState("");
+  const [loading,setLoading]=useState(true);
+  const [tab,setTab]=useState<"scenes"|"crosswalk">("scenes");
+  useEffect(()=>{api.videoStoryboard(params.projectId).then(setData).catch(e=>setError(e instanceof Error?e.message:"Không tải được kịch bản video")).finally(()=>setLoading(false));},[params.projectId]);
+  const checks=useMemo(()=>data?Object.entries(data.quality_checks):[],[data]);
+
+  if(loading)return <main className="min-h-screen bg-[#f6f8fe] p-10 text-center text-sm text-slate-500">Đang tạo bảng đối chiếu và kịch bản video…</main>;
+  if(error||!data)return <main className="min-h-screen bg-[#f6f8fe] p-8"><div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">{error||"Không có dữ liệu video"}</div></main>;
+
+  return <main className="min-h-screen bg-[#f6f8fe] text-slate-900">
+    <header className="sticky top-0 z-40 border-b border-indigo-100 bg-white/95 backdrop-blur"><div className="flex h-[68px] items-center gap-3 px-4 md:px-7"><button onClick={()=>location.href="/projects/"+params.projectId+"/editor"} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-black">← Editor</button><div><div className="text-[10px] font-black uppercase tracking-wider text-indigo-600">Video bài giảng</div><div className="line-clamp-1 text-sm font-black">{data.title}</div></div><div className="ml-auto rounded-xl bg-indigo-50 px-3 py-2 text-xs font-black text-indigo-700">1920×1080 · 16:9</div></div></header>
+    <div className="mx-auto max-w-7xl p-4 md:p-8">
+      <section className="rounded-[28px] bg-gradient-to-br from-indigo-700 via-violet-600 to-indigo-500 p-6 text-white shadow-xl shadow-indigo-100 md:p-8">
+        <div className="grid gap-5 lg:grid-cols-[1fr_360px] lg:items-center"><div><div className="text-xs font-black uppercase tracking-[.16em] text-indigo-100">Source-safe Video Director</div><h1 className="mt-2 text-3xl font-black">Kịch bản video đã được dựng theo thứ tự bài giảng</h1><p className="mt-3 max-w-3xl text-sm leading-6 text-indigo-100">Mỗi cảnh giữ liên kết tới slide và nguồn. Video chỉ được phép render khi toàn bộ source chunks được bao phủ và các cảnh kiến thức đều có dẫn chiếu nguồn.</p></div><div className="rounded-2xl border border-white/20 bg-white/10 p-5"><div className="text-[10px] font-black uppercase text-indigo-100">Trạng thái kiểm tra</div><div className="mt-1 text-4xl font-black">{data.source_coverage_pct}%</div><div className="mt-1 text-xs text-indigo-100">{data.used_source_chunk_count}/{data.source_chunk_count} source chunks</div><div className={"mt-3 inline-flex rounded-full px-3 py-1 text-[10px] font-black "+(data.ready_for_render?"bg-emerald-300 text-emerald-950":"bg-amber-200 text-amber-900")}>{data.ready_for_render?"Sẵn sàng render":"Chưa đủ điều kiện render"}</div></div></div>
+      </section>
+
+      <section className="mt-5 grid gap-3 sm:grid-cols-4"><div className="rounded-2xl border bg-white p-4"><div className="text-[10px] font-black uppercase text-slate-400">Slide nguồn</div><div className="mt-1 text-2xl font-black">{data.slide_count}</div></div><div className="rounded-2xl border bg-white p-4"><div className="text-[10px] font-black uppercase text-slate-400">Cảnh video</div><div className="mt-1 text-2xl font-black">{data.scene_count}</div></div><div className="rounded-2xl border bg-white p-4"><div className="text-[10px] font-black uppercase text-slate-400">Thời lượng dự kiến</div><div className="mt-1 text-xl font-black">{fmtTime(data.estimated_duration_seconds)}</div></div><div className="rounded-2xl border bg-white p-4"><div className="text-[10px] font-black uppercase text-slate-400">Ngôn ngữ</div><div className="mt-1 text-2xl font-black">VI</div><div className="text-[10px] text-slate-400">{data.language}</div></div></section>
+
+      {data.warnings.length>0&&<div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-800">{data.warnings.join(" · ")}</div>}
+
+      <section className="mt-5 rounded-2xl border bg-white p-4"><div className="flex flex-wrap gap-2">{checks.map(([k,v])=><span key={k} className={"rounded-full px-3 py-1.5 text-[10px] font-black "+(v?"bg-emerald-50 text-emerald-700":"bg-rose-50 text-rose-700")}>{v?"✓":"!"} {k.replaceAll("_"," ")}</span>)}</div></section>
+
+      <div className="mt-6 flex gap-2"><button onClick={()=>setTab("scenes")} className={"rounded-xl px-4 py-2 text-xs font-black "+(tab==="scenes"?"bg-indigo-600 text-white":"border bg-white")}>Kịch bản cảnh</button><button onClick={()=>setTab("crosswalk")} className={"rounded-xl px-4 py-2 text-xs font-black "+(tab==="crosswalk"?"bg-indigo-600 text-white":"border bg-white")}>Bảng đối chiếu nội dung</button></div>
+
+      {tab==="scenes"&&<div className="mt-4 space-y-4">{data.scenes.map(scene=><article key={scene.scene_id} className="overflow-hidden rounded-2xl border bg-white shadow-sm"><div className="flex flex-wrap items-center gap-2 border-b bg-slate-50 px-4 py-3"><span className="rounded-lg bg-indigo-600 px-2 py-1 text-[10px] font-black text-white">Cảnh {scene.scene_number}</span><span className="text-xs font-black">{scene.scene_role}</span><span className="ml-auto text-[10px] text-slate-400">Slide {scene.source_slide_order} · {scene.duration_seconds}s · {scene.visual.layout}</span></div><div className="grid gap-5 p-5 lg:grid-cols-[1fr_.9fr]"><div><h3 className="text-lg font-black">{scene.title}</h3><div className="mt-3 space-y-2">{scene.onscreen_text.map((x,i)=><div key={i} className="rounded-xl bg-indigo-50/60 p-3 text-sm leading-5">{x}</div>)}</div>{scene.question&&<div className="mt-3 rounded-xl border border-violet-200 bg-violet-50 p-3 text-sm font-bold text-violet-800">? {scene.question}<div className="mt-1 text-[10px] font-medium text-violet-500">Dừng {scene.pause_after_question_seconds}s để học sinh suy nghĩ</div></div>}</div><div><div className="text-[10px] font-black uppercase text-slate-400">Lời thuyết minh</div><p className="mt-2 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">{scene.narration||"—"}</p><div className="mt-3 text-[10px] font-black uppercase text-slate-400">Hoạt động học sinh</div><p className="mt-1 text-xs leading-5 text-slate-500">{scene.student_activity||"—"}</p><div className="mt-3 text-[10px] font-black uppercase text-slate-400">Nguồn</div><div className="mt-1 text-xs text-slate-500">{scene.sources.length?scene.sources.map((x:any)=>x.file_name).join(" · "):"Không yêu cầu nguồn trực tiếp"}</div></div></div></article>)}</div>}
+
+      {tab==="crosswalk"&&<div className="mt-4 overflow-x-auto rounded-2xl border bg-white"><table className="min-w-full text-left text-xs"><thead className="bg-slate-50 text-[10px] uppercase text-slate-400"><tr><th className="px-4 py-3">Nội dung trong bài giảng</th><th className="px-4 py-3">Loại</th><th className="px-4 py-3">Cảnh video</th><th className="px-4 py-3">Giữ nguyên?</th></tr></thead><tbody>{data.content_crosswalk.map((row,i)=><tr key={i} className="border-t"><td className="max-w-2xl px-4 py-3 leading-5"><div className="font-semibold text-slate-700">{row.content}</div>{row.source_document&&<div className="mt-1 text-[10px] text-slate-400">{row.source_document}{row.heading?" · "+row.heading:""}</div>}</td><td className="px-4 py-3">{row.kind}</td><td className="px-4 py-3 font-mono text-[10px]">{row.scene_ids.join(", ")}</td><td className="px-4 py-3"><span className="rounded-full bg-emerald-50 px-2 py-1 font-black text-emerald-700">Có</span></td></tr>)}</tbody></table></div>}
+    </div>
+  </main>;
+}
+`);
+
+const videoTopbarPath=path.join(root,"frontend/components/editor/TopBar.tsx");
+let videoTopbar=fs.readFileSync(videoTopbarPath,"utf8");
+if(!videoTopbar.includes("Video bài giảng")){
+  videoTopbar=videoTopbar.replace(
+    '<div className="my-1 border-t"/><button onClick={()=>{setOpen(false);onOpenLmsSettings();}}',
+    '<div className="my-1 border-t"/><button onClick={()=>{setOpen(false);location.href="/projects/"+project.id+"/video";}} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-indigo-50"><span className="grid h-9 w-9 place-items-center rounded-xl bg-violet-50 text-violet-600">▶</span><span><span className="block text-xs font-black">Video bài giảng</span><span className="block text-[10px] text-slate-400">Storyboard + bảng đối chiếu nguồn</span></span></button><button onClick={()=>{setOpen(false);onOpenLmsSettings();}}'
+  );
+}
+fs.writeFileSync(videoTopbarPath,videoTopbar);
