@@ -397,21 +397,45 @@ def _enhance_interaction(slide: Any, section_key: str, plan_section: dict[str, A
 
 
 
-def _design_profile(section_key: str, slide_index: int, current_visual: str, title: str) -> dict[str, str]:
+def _design_profile(section_key: str, slide_index: int, current_visual: str, title: str, bullets: list[str]) -> dict[str, str]:
     """Choose a distinct screen composition without changing factual content."""
     key = section_key or ""
     current = _clean(current_visual).lower()
+    semantic_text = " ".join([title, *bullets]).lower()
     special = {
-        "map": ("map-focus", "map"),
-        "comparison": ("comparison-2-column", "comparison"),
-        "concept_map": ("concept-map", "concept_map"),
-        "chart": ("chart-focus", "chart"),
-        "table": ("data-table", "table"),
-        "timeline": ("process-timeline", "timeline"),
+        "map": (
+            ("bản đồ", "địa lí", "kinh tuyến", "vĩ tuyến", "tọa độ", "toạ độ", "vị trí", "lãnh thổ", "latitude", "longitude", "map"),
+            ("map-focus", "map", "progressive-reveal"),
+        ),
+        "comparison": (
+            ("so sánh", "khác nhau", "giống nhau", "đối chiếu", "compare", "versus"),
+            ("comparison-2-column", "comparison", "paired-reveal"),
+        ),
+        "concept_map": (
+            ("sơ đồ tư duy", "khái niệm", "mối quan hệ", "concept map"),
+            ("concept-map", "concept_map", "branch-reveal"),
+        ),
+        "chart": (
+            ("biểu đồ", "số liệu", "tỉ lệ", "tỷ lệ", "phần trăm", "tăng", "giảm", "chart"),
+            ("chart-focus", "chart", "progressive-reveal"),
+        ),
+        "table": (
+            ("bảng", "dữ liệu", "table"),
+            ("data-table", "table", "row-reveal"),
+        ),
+        "timeline": (
+            ("trình tự", "giai đoạn", "quá trình", "các bước", "timeline", "sequence"),
+            ("process-timeline", "timeline", "step-reveal"),
+        ),
     }
     if current in special:
-        layout, visual = special[current]
-        return {"layout": layout, "visual": visual, "motion": "progressive-reveal"}
+        cues, design = special[current]
+        # A writer's visual_type is only a suggestion. Use the specialized
+        # composition when the slide content actually supports it, and limit
+        # it to every third screen so one visual family cannot dominate.
+        if slide_index % 3 == 0 and any(cue in semantic_text for cue in cues):
+            layout, visual, motion = design
+            return {"layout": layout, "visual": visual, "motion": motion}
 
     if key == "introduction":
         return {"layout": "cinematic-hero", "visual": "hero", "motion": "slow-zoom-title"}
@@ -509,6 +533,7 @@ def enrich_section_v2(section_draft: Any, *, plan_section: dict[str, Any], chunk
             index,
             str(getattr(slide, "visual_type", "") or ""),
             title,
+            bullets,
         )
         metadata = dict(getattr(slide, "metadata", {}) or {})
         metadata["elearning_v2"] = {
