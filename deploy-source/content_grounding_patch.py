@@ -1426,7 +1426,7 @@ def render_mp4(
         clips.append(clip)
 
     concat=work/"concat.txt"
-    concat.write_text("\n".join("file '"+str(x).replace("'","'\\''")+"'" for x in clips)+"\n")
+    concat.write_text("\n".join("file '"+str(x.resolve()).replace("'","'\\''")+"'" for x in clips)+"\n")
     _run([
         "ffmpeg","-y","-f","concat","-safe","0","-i",str(concat),
         "-c:v","libx264","-preset","medium","-crf","19",
