@@ -47,9 +47,6 @@ jobs:
         run: |
           find frontend/components/editor -maxdepth 2 -type f -print | sort
           sed -n '1,320p' frontend/components/editor/LessonEditor.tsx
-      - name: Inspect slide layouts
-        working-directory: src
-        run: grep -RInE 'layout_key|visual_type|SlideCanvas|slide_layout|layout=' app/services/lesson_writer frontend/components/editor | head -n 260 || true
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
