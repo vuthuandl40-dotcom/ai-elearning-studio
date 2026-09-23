@@ -52,6 +52,11 @@ jobs:
         run: |
           sed -n '1,220p' app/schemas/export.py
           sed -n '1,260p' app/api/routes/exports.py
+      - name: Inspect map-focus assignment
+        working-directory: src
+        run: |
+          grep -RIn "map-focus" app frontend || true
+          grep -RInE "recommended.*layout|choose.*layout|layout.*visual|visual.*layout|design_json" app/services frontend | head -n 320 || true
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
