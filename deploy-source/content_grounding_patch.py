@@ -859,3 +859,252 @@ s=s.replace(
 p.write_text(s)
 
 print("large-source-upload-limit-ok")
+
+
+# 16) Video lesson storyboard and strict content crosswalk.
+video_service = root / "app/services/video_lesson.py"
+video_service.write_text(r'''from __future__ import annotations
+
+from collections import defaultdict
+from typing import Any
+from uuid import UUID
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.db.models import Slide, SlideSourceRef, SourceChunk
+from app.services.export_engine.assembler import assemble_deck
+
+
+def _source_dict(source) -> dict[str, Any]:
+    return {
+        "file_name": source.file_name,
+        "heading": source.heading,
+        "page_start": source.page_start,
+        "page_end": source.page_end,
+        "claim_text": source.claim_text,
+        "content_excerpt": source.content_excerpt,
+    }
+
+
+def _scene_role(slide_type: str, section_title: str) -> str:
+    value = (slide_type or "").lower()
+    title = (section_title or "").lower()
+    if value in {"title", "warmup"} or "khởi động" in title:
+        return "Mở đầu/khởi động"
+    if value in {"interaction", "practice"}:
+        return "Hoạt động/nhiệm vụ học tập"
+    if value == "application":
+        return "Vận dụng"
+    if value in {"summary", "closing"}:
+        return "Củng cố/kết thúc"
+    if value == "objectives":
+        return "Mục tiêu bài học"
+    return "Hình thành kiến thức"
+
+
+def _split_items(items: list[str], duration: int) -> list[list[str]]:
+    clean = [str(x).strip() for x in items if str(x).strip()]
+    if len(clean) <= 3 or duration < 35:
+        return [clean]
+    cut = max(2, (len(clean) + 1) // 2)
+    return [clean[:cut], clean[cut:]]
+
+
+def build_video_storyboard(db: Session, project_id: UUID) -> dict[str, Any]:
+    deck = assemble_deck(db, project_id, only_approved=False)
+    if not deck.slides:
+        raise ValueError("Project has no slides to build video storyboard")
+
+    all_chunk_ids = {
+        str(x) for x in db.scalars(
+            select(SourceChunk.id).where(SourceChunk.project_id == project_id)
+        )
+    }
+    used_chunk_ids = {
+        str(x) for x in db.scalars(
+            select(SlideSourceRef.source_chunk_id)
+            .join(Slide, SlideSourceRef.slide_id == Slide.id)
+            .where(Slide.project_id == project_id)
+        )
+    }
+    covered = used_chunk_ids & all_chunk_ids
+    coverage_pct = round(100 * len(covered) / max(1, len(all_chunk_ids))) if all_chunk_ids else 100
+    missing = sorted(all_chunk_ids - used_chunk_ids)
+
+    scenes: list[dict[str, Any]] = []
+    slide_scene_ids: dict[str, list[str]] = defaultdict(list)
+    for slide in sorted(deck.slides, key=lambda x: x.order):
+        duration = max(8, int(slide.duration_seconds or 15))
+        groups = _split_items(slide.onscreen_text, duration)
+        per_scene = max(8, round(duration / max(1, len(groups))))
+        interaction_question = slide.interactions[0].question if slide.interactions else None
+        question = slide.guiding_question or interaction_question
+        for part_index, items in enumerate(groups, start=1):
+            scene_id = f"s{slide.order:03d}-{part_index}"
+            slide_scene_ids[slide.id].append(scene_id)
+            narration = (slide.teacher_script or "").strip() if part_index == 1 else ""
+            if not narration:
+                if question and part_index == len(groups):
+                    narration = question
+                elif slide.student_instruction:
+                    narration = slide.student_instruction
+                else:
+                    narration = " ".join(items)
+            scene = {
+                "scene_id": scene_id,
+                "scene_number": len(scenes) + 1,
+                "source_slide_id": slide.id,
+                "source_slide_order": slide.order,
+                "section_title": slide.section_title,
+                "scene_role": _scene_role(slide.slide_type, slide.section_title),
+                "title": slide.title,
+                "onscreen_text": items,
+                "visual": {
+                    "layout": slide.layout_key,
+                    "theme": slide.theme_key,
+                    "media": [
+                        {
+                            "asset_id": media.asset_id,
+                            "asset_type": media.asset_type,
+                            "role": media.role,
+                            "original_name": media.original_name,
+                        }
+                        for media in slide.media
+                    ],
+                },
+                "narration": narration,
+                "student_activity": slide.student_instruction,
+                "question": question if part_index == len(groups) else None,
+                "pause_after_question_seconds": 4 if question and part_index == len(groups) else 0,
+                "duration_seconds": per_scene + (4 if question and part_index == len(groups) else 0),
+                "transition": "smooth",
+                "sources": [_source_dict(x) for x in slide.sources],
+                "source_verified": bool(slide.sources) or slide.slide_type in {"title", "objectives", "references"},
+            }
+            scenes.append(scene)
+
+    crosswalk: list[dict[str, Any]] = []
+    for slide in sorted(deck.slides, key=lambda x: x.order):
+        scene_ids = slide_scene_ids.get(slide.id, [])
+        crosswalk.append({
+            "kind": "Tiêu đề",
+            "content": slide.title,
+            "source_slide_order": slide.order,
+            "scene_ids": scene_ids,
+            "kept": True,
+        })
+        if slide.student_instruction:
+            crosswalk.append({
+                "kind": "Nhiệm vụ học tập",
+                "content": slide.student_instruction,
+                "source_slide_order": slide.order,
+                "scene_ids": scene_ids,
+                "kept": True,
+            })
+        if slide.guiding_question:
+            crosswalk.append({
+                "kind": "Câu hỏi",
+                "content": slide.guiding_question,
+                "source_slide_order": slide.order,
+                "scene_ids": scene_ids,
+                "kept": True,
+            })
+        for source in slide.sources:
+            crosswalk.append({
+                "kind": "Kiến thức nguồn",
+                "content": source.claim_text or source.content_excerpt or source.heading or source.file_name,
+                "source_document": source.file_name,
+                "heading": source.heading,
+                "page_start": source.page_start,
+                "page_end": source.page_end,
+                "source_slide_order": slide.order,
+                "scene_ids": scene_ids,
+                "kept": True,
+            })
+        if slide.slide_type in {"summary", "closing"}:
+            crosswalk.append({
+                "kind": "Kết luận",
+                "content": " ".join(slide.onscreen_text),
+                "source_slide_order": slide.order,
+                "scene_ids": scene_ids,
+                "kept": True,
+            })
+
+    warnings: list[str] = []
+    if coverage_pct < 100:
+        warnings.append(
+            f"Video chưa được phép render: độ phủ nguồn {coverage_pct}%, còn thiếu {len(missing)} source chunks."
+        )
+    scenes_without_source = [
+        x["scene_id"] for x in scenes
+        if not x["source_verified"] and x["scene_role"] in {"Hình thành kiến thức", "Hoạt động/nhiệm vụ học tập", "Vận dụng"}
+    ]
+    if scenes_without_source:
+        warnings.append(
+            "Các cảnh kiến thức chưa có dẫn chiếu nguồn: " + ", ".join(scenes_without_source[:20])
+        )
+
+    ready = coverage_pct == 100 and not scenes_without_source
+    return {
+        "project_id": str(project_id),
+        "title": deck.title,
+        "language": "vi-VN",
+        "audience": "THCS" if (deck.education_level or "").upper() == "THCS" else deck.education_level,
+        "video_spec": {
+            "aspect_ratio": "16:9",
+            "width": 1920,
+            "height": 1080,
+            "container": "mp4",
+            "quality": "high",
+            "voice": "Vietnamese teacher",
+            "background_music": "light, non-distracting, licensed/royalty-free only",
+        },
+        "source_coverage_pct": coverage_pct,
+        "source_chunk_count": len(all_chunk_ids),
+        "used_source_chunk_count": len(covered),
+        "missing_source_chunk_ids": missing,
+        "slide_count": len(deck.slides),
+        "scene_count": len(scenes),
+        "estimated_duration_seconds": sum(int(x["duration_seconds"]) for x in scenes),
+        "content_crosswalk": crosswalk,
+        "scenes": scenes,
+        "quality_checks": {
+            "all_source_content_covered": coverage_pct == 100,
+            "slide_order_preserved": True,
+            "all_slides_mapped_to_scenes": len(slide_scene_ids) == len(deck.slides),
+            "questions_have_pause": all(
+                (not x.get("question")) or int(x.get("pause_after_question_seconds") or 0) >= 3
+                for x in scenes
+            ),
+            "source_verified_learning_scenes": not scenes_without_source,
+        },
+        "ready_for_render": ready,
+        "warnings": warnings,
+    }
+''')
+
+p = root / "app/api/routes/exports.py"
+s = p.read_text()
+if "video/storyboard" not in s:
+    s = s.replace(
+        "from app.services.export_engine.service import execute_export",
+        "from app.services.export_engine.service import execute_export\nfrom app.services.video_lesson import build_video_storyboard",
+    )
+    marker = '@router.post("/projects/{project_id}/exports"'
+    endpoint = '''@router.get("/projects/{project_id}/video/storyboard")
+def video_storyboard(project_id: UUID, db: Session = Depends(get_db), user: AppUser = Depends(get_current_user)):
+    require_project_access(db, project_id, user, write=False)
+    try:
+        return build_video_storyboard(db, project_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+'''
+    if marker not in s:
+        raise RuntimeError("exports route insertion marker not found")
+    s = s.replace(marker, endpoint + marker)
+p.write_text(s)
+
+print("video-storyboard-and-crosswalk-ok")
