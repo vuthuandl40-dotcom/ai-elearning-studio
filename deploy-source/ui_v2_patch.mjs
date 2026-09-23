@@ -773,3 +773,54 @@ if(!videoTopbar.includes("Video bài giảng")){
   );
 }
 fs.writeFileSync(videoTopbarPath,videoTopbar);
+
+
+const mp4ExportUiPath=path.join(root,"frontend/lib/types.ts");
+let mp4Types=fs.readFileSync(mp4ExportUiPath,"utf8");
+mp4Types=mp4Types.replace(
+  /export type ExportFormat\s*=\s*([^;]+);/,
+  (full,union)=> union.includes('"mp4"') ? full : 'export type ExportFormat = '+union.trim()+' | "mp4";'
+);
+fs.writeFileSync(mp4ExportUiPath,mp4Types);
+
+const mp4TopbarPath=path.join(root,"frontend/components/editor/TopBar.tsx");
+let mp4Topbar=fs.readFileSync(mp4TopbarPath,"utf8");
+if(!mp4Topbar.includes('["mp4","Video MP4"')){
+  mp4Topbar=mp4Topbar.replace(
+    '["pdf","PDF","Bản đọc nhanh"],',
+    '["pdf","PDF","Bản đọc nhanh"],\n        ["mp4","Video MP4","Full HD 1920×1080 · giọng giáo viên Việt"],'
+  );
+}
+fs.writeFileSync(mp4TopbarPath,mp4Topbar);
+
+const mp4ExportCenterPath=path.join(root,"frontend/app/projects/[projectId]/export/page.tsx");
+let mp4ExportCenter=fs.readFileSync(mp4ExportCenterPath,"utf8");
+if(!mp4ExportCenter.includes('format:"mp4"')){
+  mp4ExportCenter=mp4ExportCenter.replace(
+    '{format:"pdf",icon:"PDF",name:"PDF",desc:"Bản đọc nhanh, bố cục cố định để chia sẻ hoặc in.",badge:"PDF"},',
+    '{format:"pdf",icon:"PDF",name:"PDF",desc:"Bản đọc nhanh, bố cục cố định để chia sẻ hoặc in.",badge:"PDF"},\n  {format:"mp4",icon:"▶",name:"Video bài giảng MP4",desc:"Full HD 1920×1080, 16:9, dựng theo storyboard đã đối chiếu nguồn và giọng giáo viên Việt.",badge:"VIDEO"},'
+  );
+  mp4ExportCenter=mp4ExportCenter.replace(
+    '        include_quiz:includeQuiz,\n      });',
+    '        include_quiz:includeQuiz,\n        ...(format==="mp4"?{voice_enabled:true,voice_name:"vi-VN-HoaiMyNeural",voice_rate:"+0%",require_full_source_coverage:true}:{}),\n      });'
+  );
+}
+fs.writeFileSync(mp4ExportCenterPath,mp4ExportCenter);
+
+const mp4StoryboardPath=path.join(root,"frontend/app/projects/[projectId]/video/page.tsx");
+let mp4Storyboard=fs.readFileSync(mp4StoryboardPath,"utf8");
+if(!mp4Storyboard.includes("exportMp4")){
+  mp4Storyboard=mp4Storyboard.replace(
+    '  const [tab,setTab]=useState<"scenes"|"crosswalk">("scenes");',
+    '  const [tab,setTab]=useState<"scenes"|"crosswalk">("scenes");\n  const [exporting,setExporting]=useState(false);'
+  );
+  mp4Storyboard=mp4Storyboard.replace(
+    '  const checks=useMemo(()=>data?Object.entries(data.quality_checks):[],[data]);',
+    '  const checks=useMemo(()=>data?Object.entries(data.quality_checks):[],[data]);\n  async function exportMp4(){ if(!data?.ready_for_render||exporting)return; setExporting(true);setError("");try{const run=await api.createExport(params.projectId,"mp4" as any,{voice_enabled:true,voice_name:"vi-VN-HoaiMyNeural",voice_rate:"+0%",require_full_source_coverage:true});await api.downloadExport(run);}catch(e){setError(e instanceof Error?e.message:"Không xuất được MP4");}finally{setExporting(false);} }'
+  );
+  mp4Storyboard=mp4Storyboard.replace(
+    '<div className="ml-auto rounded-xl bg-indigo-50 px-3 py-2 text-xs font-black text-indigo-700">1920×1080 · 16:9</div>',
+    '<div className="ml-auto flex items-center gap-2"><span className="rounded-xl bg-indigo-50 px-3 py-2 text-xs font-black text-indigo-700">1920×1080 · 16:9</span><button disabled={!data.ready_for_render||exporting} onClick={exportMp4} className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-black text-white disabled:opacity-40">{exporting?"Đang dựng MP4…":"▶ Xuất MP4"}</button></div>'
+  );
+}
+fs.writeFileSync(mp4StoryboardPath,mp4Storyboard);
