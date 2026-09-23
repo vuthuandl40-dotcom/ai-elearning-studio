@@ -105,7 +105,12 @@ assert "interaction_2" not in _build_body or _ai_enrich < _ai_validate
 print("writer-enrich-before-validate-regression-ok")
 
 
-from app.services.lesson_writer.v2 import _design_profile
+import importlib.util as _importlib_util
+_v2_spec=_importlib_util.spec_from_file_location("elearning_v2_test", _Path("../deploy-source/elearning_v2.py"))
+assert _v2_spec and _v2_spec.loader
+_v2_module=_importlib_util.module_from_spec(_v2_spec)
+_v2_spec.loader.exec_module(_v2_module)
+_design_profile=_v2_module._design_profile
 
 _sections=[
     "introduction","objectives","warmup","lead_in",
