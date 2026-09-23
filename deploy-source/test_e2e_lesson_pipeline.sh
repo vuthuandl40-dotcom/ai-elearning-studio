@@ -155,5 +155,6 @@ assert "content-disposition:" in headers and ".pptx" in headers, headers
 print("e2e-pptx-download-ok", p.stat().st_size, len(slides))
 PY
 
-curl -fsS -c "$COOKIE" -b "$COOKIE" -X DELETE "$API/projects/$PROJECT_ID" >/tmp/e2e-delete.json
+printf '%s' "$PROJECT_ID" >/tmp/e2e-project-id
+bash deploy-source/test_video_pipeline.sh
 echo "e2e-lesson-plan-pipeline-ok"
