@@ -15,7 +15,9 @@ counts=Counter(layouts)
 assert len(counts)>=10, f"slide layouts are too repetitive: {counts}"
 dominant=max(counts.values())/max(1,len(layouts))
 assert dominant<=0.25, f"one slide layout dominates {dominant:.0%}: {counts}"
-for i in range(max(0,len(layouts)-2)):\n    assert not (layouts[i] and layouts[i]==layouts[i+1]==layouts[i+2]), f"three consecutive slides share one layout: {layouts[i:i+3]}"\nprint("e2e-slide-diversity-ok",len(counts),"layouts","dominant",round(dominant,3))
+for i in range(max(0,len(layouts)-2)):
+    assert not (layouts[i] and layouts[i]==layouts[i+1]==layouts[i+2]), f"three consecutive slides share one layout: {layouts[i:i+3]}"
+print("e2e-slide-diversity-ok",len(counts),"layouts","dominant",round(dominant,3))
 PY
 
 curl -fsS -c "$COOKIE" -b "$COOKIE" "$API/projects/$PROJECT_ID/video/storyboard" >/tmp/e2e-video-storyboard.json
