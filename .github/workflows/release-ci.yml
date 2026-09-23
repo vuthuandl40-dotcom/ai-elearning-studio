@@ -57,6 +57,13 @@ jobs:
         run: |
           grep -RIn "map-focus" app frontend || true
           grep -RInE "recommended.*layout|choose.*layout|layout.*visual|visual.*layout|design_json" app/services frontend | head -n 320 || true
+      - name: Inspect slide layout persistence
+        working-directory: src
+        run: |
+          sed -n '40,280p' app/services/lesson_writer/local_writer.py
+          sed -n '80,340p' app/services/lesson_writer/service.py
+          sed -n '1,220p' app/services/lesson_writer/types.py
+          sed -n '1,220p' frontend/components/editor/SlideStage.tsx
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
