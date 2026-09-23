@@ -1126,7 +1126,7 @@ s=s.replace(
 if "voice_enabled:" not in s:
     s=s.replace(
         "    only_approved: bool = False\n",
-        '    only_approved: bool = False\n    voice_enabled: bool = True\n    voice_name: str = "vi-VN-HoaiMyNeural"\n    voice_rate: str = "+0%"\n    require_full_source_coverage: bool = True\n'
+        '    only_approved: bool = False\n    voice_enabled: bool = True\n    voice_name: str = "vi-VN-HoaiMyNeural"\n    voice_rate: str = "+0%"\n    require_full_source_coverage: bool = True\n    scene_limit: int | None = Field(default=None, ge=1, le=20)\n'
     )
 p.write_text(s)
 
@@ -1366,6 +1366,7 @@ def render_mp4(
     voice_name:str="vi-VN-HoaiMyNeural",
     voice_rate:str="+0%",
     require_full_source_coverage:bool=True,
+    scene_limit:int|None=None,
 )->list[str]:
     if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
         raise RuntimeError("Máy chủ chưa có ffmpeg/ffprobe để xuất MP4.")
@@ -1384,7 +1385,8 @@ def render_mp4(
     work.mkdir(parents=True,exist_ok=True)
     clips=[]
     warnings=[]
-    for scene in storyboard["scenes"]:
+    scenes = storyboard["scenes"][:scene_limit] if scene_limit else storyboard["scenes"]
+    for scene in scenes:
         idx=int(scene["scene_number"])
         frame=work/f"scene-{idx:03d}.png"
         audio=work/f"scene-{idx:03d}.mp3"
@@ -1462,6 +1464,7 @@ if 'elif run.format == "mp4":' not in s:
                 voice_name=str(options.get("voice_name") or "vi-VN-HoaiMyNeural"),
                 voice_rate=str(options.get("voice_rate") or "+0%"),
                 require_full_source_coverage=bool(options.get("require_full_source_coverage", True)),
+                scene_limit=int(options["scene_limit"]) if options.get("scene_limit") else None,
             ))
             mime = "video/mp4"
 '''
