@@ -64,6 +64,10 @@ jobs:
           sed -n '80,340p' app/services/lesson_writer/service.py
           sed -n '1,220p' app/services/lesson_writer/types.py
           sed -n '1,220p' frontend/components/editor/SlideStage.tsx
+      - name: Inspect layout assignment
+        working-directory: src
+        run: |
+          grep -RInE 'map-focus|cinematic-hero|question-spotlight|layout_key|layout =' app frontend | head -n 500 || true
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
