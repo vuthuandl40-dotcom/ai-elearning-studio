@@ -396,6 +396,89 @@ def _enhance_interaction(slide: Any, section_key: str, plan_section: dict[str, A
     })
 
 
+
+def _design_profile(section_key: str, slide_index: int, current_visual: str, title: str) -> dict[str, str]:
+    """Choose a distinct screen composition without changing factual content."""
+    key = section_key or ""
+    current = _clean(current_visual).lower()
+    special = {
+        "map": ("map-focus", "map"),
+        "comparison": ("comparison-2-column", "comparison"),
+        "concept_map": ("concept-map", "concept_map"),
+        "chart": ("chart-focus", "chart"),
+        "table": ("data-table", "table"),
+        "timeline": ("process-timeline", "timeline"),
+    }
+    if current in special:
+        layout, visual = special[current]
+        return {"layout": layout, "visual": visual, "motion": "progressive-reveal"}
+
+    if key == "introduction":
+        return {"layout": "cinematic-hero", "visual": "hero", "motion": "slow-zoom-title"}
+    if key == "objectives":
+        return {"layout": "milestone-checklist", "visual": "learning_objectives", "motion": "staggered-reveal"}
+    if key == "warmup":
+        return {"layout": "question-spotlight", "visual": "hook_visual", "motion": "question-pause"}
+    if key == "lead_in":
+        return {"layout": "scenario-stage", "visual": "scenario", "motion": "scene-reveal"}
+    if key == "explore_1":
+        layouts = [
+            ("annotated-visual", "annotated_image", "hotspot-reveal"),
+            ("split-visual-explain", "educational_illustration", "left-right-reveal"),
+            ("zoom-detail", "closeup_diagram", "zoom-and-label"),
+        ]
+    elif key == "explore_2":
+        layouts = [
+            ("comparison-2-column", "comparison", "paired-reveal"),
+            ("evidence-board", "evidence_cards", "card-reveal"),
+            ("text-left-visual-right", "educational_illustration", "right-focus"),
+        ]
+    elif key == "explore_3":
+        layouts = [
+            ("process-timeline", "process_diagram", "step-reveal"),
+            ("cause-effect", "cause_effect_diagram", "connector-reveal"),
+            ("full-bleed-annotated", "annotated_image", "pan-and-label"),
+        ]
+    elif key == "interaction_1":
+        return {"layout": "quiz-card", "visual": "quiz_ui", "motion": "choice-feedback"}
+    elif key == "interaction_2":
+        return {"layout": "fill-blank-focus", "visual": "quiz_ui", "motion": "blank-answer-feedback"}
+    elif key == "interaction_3":
+        return {"layout": "evidence-choice", "visual": "quiz_ui", "motion": "evidence-feedback"}
+    elif key == "practice":
+        layouts = [
+            ("activity-board", "practice_board", "task-reveal"),
+            ("matching-workspace", "matching_ui", "pair-reveal"),
+            ("sequence-workspace", "sequence_ui", "step-reveal"),
+        ]
+    elif key == "application":
+        return {"layout": "real-world-scenario", "visual": "scenario", "motion": "scenario-decision"}
+    elif key == "summary":
+        return {"layout": "concept-map", "visual": "concept_map", "motion": "branch-reveal"}
+    elif key == "closing":
+        return {"layout": "takeaway-cards", "visual": "takeaway", "motion": "card-reveal"}
+    elif key == "references":
+        return {"layout": "source-list", "visual": "references", "motion": "none"}
+    else:
+        layouts = [
+            ("visual-left-text-right", "educational_illustration", "left-right-reveal"),
+            ("text-left-visual-right", "educational_illustration", "right-focus"),
+            ("center-focus", "infographic", "center-reveal"),
+        ]
+
+    layout, visual, motion = layouts[slide_index % len(layouts)]
+    return {"layout": layout, "visual": visual, "motion": motion}
+
+
+def _visual_direction_text(design: dict[str, str], title: str, bullets: list[str]) -> str:
+    focus = bullets[0] if bullets else title
+    return (
+        f"{design['visual']} cho nội dung '{title}', bố cục {design['layout']}; "
+        f"một trọng tâm thị giác rõ ràng; ưu tiên minh họa trực tiếp ý: {focus}. "
+        "Không thêm số liệu, địa danh hay kiến thức ngoài học liệu."
+    )
+
+
 def _copy(model: Any, updates: dict[str, Any]) -> Any:
     if hasattr(model, "model_copy"):
         return model.model_copy(update=updates)
@@ -421,6 +504,12 @@ def enrich_section_v2(section_draft: Any, *, plan_section: dict[str, Any], chunk
             student = _student_action(profile, title)
         script = _teacher_script(str(getattr(slide, "teacher_script", "")), title, question, profile, bullets)
         interaction = _enhance_interaction(slide, section_key, plan_section, chunks_by_id)
+        design = _design_profile(
+            section_key,
+            index,
+            str(getattr(slide, "visual_type", "") or ""),
+            title,
+        )
         metadata = dict(getattr(slide, "metadata", {}) or {})
         metadata["elearning_v2"] = {
             "version": V2_VERSION,
@@ -438,6 +527,9 @@ def enrich_section_v2(section_draft: Any, *, plan_section: dict[str, Any], chunk
             "source_safe": True,
             "content_depth": "rich" if len(bullets) >= 3 else "needs-review",
             "scored_interaction": interaction is not None,
+            "layout_family": design["layout"],
+            "visual_family": design["visual"],
+            "motion_pattern": design["motion"],
         }
         enriched.append(_copy(slide, {
             "onscreen_text": bullets or getattr(slide, "onscreen_text", []),
@@ -445,6 +537,9 @@ def enrich_section_v2(section_draft: Any, *, plan_section: dict[str, Any], chunk
             "student_instruction": student,
             "guiding_question": question,
             "interaction": interaction,
+            "layout_hint": design["layout"],
+            "visual_type": design["visual"],
+            "visual_description": _visual_direction_text(design, title, bullets),
             "metadata": metadata,
         }))
     result = _copy(section_draft, {"slides": enriched})
