@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends xz-utils coreutils libreoffice-impress libreoffice-core fonts-dejavu-core curl ca-certificates patch && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends xz-utils coreutils libreoffice-impress libreoffice-core fonts-dejavu-core ffmpeg curl ca-certificates patch && rm -rf /var/lib/apt/lists/*
 COPY deploy-source/ /tmp/deploy-source/
 RUN cat /tmp/deploy-source/source.b64.* | base64 -d > /tmp/source.tar.xz \
     && echo "6d12efd05141a0f954ac1be2bcb644dcaee9771d0973757fde99d9ca0f80461a  /tmp/source.tar.xz" | sha256sum -c - \
