@@ -87,3 +87,19 @@ coverage,used,total=_draft_source_coverage(draft,{"sections":[
 assert (used,total)==(4,5)
 assert abs(coverage-0.8)<1e-9, coverage
 print("final-draft-source-coverage-regression-ok")
+
+
+# Regression: V2 must enrich interactions before section validation inside _build_section.
+from pathlib import Path as _Path
+_service_text=_Path("app/services/lesson_writer/service.py").read_text()
+_build_start=_service_text.index("def _build_section(")
+_build_end=_service_text.find("\ndef ", _build_start+1)
+_build_body=_service_text[_build_start:_build_end if _build_end>0 else None]
+_ai_enrich=_build_body.index("candidate = enrich_section_v2(")
+_ai_validate=_build_body.index("candidate = validate_and_repair_section(")
+_local_enrich=_build_body.index("local = enrich_section_v2(")
+_local_validate=_build_body.index("local = validate_and_repair_section(")
+assert _ai_enrich < _ai_validate, "AI writer validation occurs before V2 interaction enrichment"
+assert _local_enrich < _local_validate, "Local fallback validation occurs before V2 interaction enrichment"
+assert "interaction_2" not in _build_body or _ai_enrich < _ai_validate
+print("writer-enrich-before-validate-regression-ok")
