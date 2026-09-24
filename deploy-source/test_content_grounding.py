@@ -180,3 +180,52 @@ assert _catalog_by_key["map-focus"]["elements"]["visual"][2] >= 60
 assert _catalog_by_key["comparison-2-column"]["elements"]["body"] != _catalog_by_key["map-focus"]["elements"]["body"]
 assert _catalog_by_key["process-timeline"]["elements"]["visual"] != _catalog_by_key["annotated-visual"]["elements"]["visual"]
 print("v2-visual-catalog-regression-ok",len(_required_v2_layouts),"layouts",len(_geometry_signatures),"geometries")
+
+
+# Semantic slide-layout regression: layouts must follow the learning task,
+# not merely the subject vocabulary.
+from app.services.lesson_writer.v2 import _design_profile
+
+def _layout(title, bullets=None, visual="", index=0, previous=None, interaction_type=""):
+    return _design_profile(
+        "explore_1", index, visual, title, bullets or [],
+        interaction_type=interaction_type,
+        previous_layouts=previous or [],
+    )["layout"]
+
+assert _layout("Phân tích bảng số liệu dân số", ["Bảng số liệu cho biết..."]) == "data-table"
+assert _layout("Nhận xét biểu đồ cơ cấu", ["Quan sát biểu đồ tròn..."]) == "chart-focus"
+assert _layout("Nguyên nhân và hệ quả của hiện tượng", ["Nguyên nhân...", "Hệ quả..."]) == "cause-effect"
+assert _layout("Quy trình hình thành", ["Các bước diễn ra theo trình tự..."]) == "process-timeline"
+assert _layout("So sánh hai khu vực", ["Khác nhau về..."]) == "comparison-2-column"
+
+# Concept vocabulary alone must not turn every geography slide into a map.
+coord_layout = _layout(
+    "Khái niệm kinh tuyến và vĩ tuyến",
+    ["Kinh tuyến và vĩ tuyến được dùng để xác định tọa độ địa lí."],
+    visual="map",
+)
+assert coord_layout != "map-focus", coord_layout
+
+map_layout = _layout(
+    "Xác định vị trí trên bản đồ",
+    ["Quan sát bản đồ và xác định vị trí địa lí của khu vực."],
+    visual="map",
+)
+assert map_layout == "map-focus", map_layout
+
+map_layout_2 = _layout(
+    "Khai thác bản đồ",
+    ["Quan sát bản đồ và nhận xét sự phân bố."],
+    visual="map",
+    previous=["map-focus"],
+)
+assert map_layout_2 != "map-focus", map_layout_2
+
+practice_match = _design_profile(
+    "practice", 0, "quiz_ui", "Luyện tập", ["Ghép nội dung"],
+    interaction_type="matching",
+    previous_layouts=[],
+)["layout"]
+assert practice_match == "matching-workspace", practice_match
+print("semantic-layout-selection-regression-ok")
