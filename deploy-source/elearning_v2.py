@@ -711,3 +711,175 @@ def enrich_section_v2(section_draft: Any, *, plan_section: dict[str, Any], chunk
         warnings.append(f"E-Learning V2: {sparse} màn hình chưa đủ 3 ý nguồn; nên bổ sung học liệu hoặc kiểm tra lại trước khi duyệt.")
         result = _copy(result, {"warnings": warnings})
     return result
+
+
+def _layout_visual(layout: str) -> str:
+    return {
+        "cinematic-hero": "hero",
+        "milestone-checklist": "learning_objectives",
+        "question-spotlight": "hook_visual",
+        "scenario-stage": "scenario",
+        "quiz-card": "quiz_ui",
+        "fill-blank-focus": "quiz_ui",
+        "evidence-choice": "evidence_cards",
+        "real-world-scenario": "scenario",
+        "concept-map": "concept_map",
+        "takeaway-cards": "takeaway",
+        "source-list": "references",
+        "activity-board": "practice_board",
+        "matching-workspace": "matching_ui",
+        "sequence-workspace": "sequence_ui",
+        "comparison-2-column": "comparison",
+        "evidence-board": "evidence_cards",
+        "split-visual-explain": "educational_illustration",
+        "chart-focus": "chart",
+        "data-table": "table",
+        "process-timeline": "process_diagram",
+        "cause-effect": "cause_effect_diagram",
+        "map-focus": "map",
+        "annotated-visual": "annotated_image",
+        "zoom-detail": "closeup_diagram",
+        "full-bleed-annotated": "annotated_image",
+        "visual-left-text-right": "educational_illustration",
+        "text-left-visual-right": "educational_illustration",
+        "center-focus": "infographic",
+    }.get(layout, "infographic")
+
+
+def _semantic_layout_candidates(slide: Any, current: str) -> list[str]:
+    title = _clean(str(getattr(slide, "title", "")))
+    bullets = _existing_bullets(slide)
+    text = " ".join([title, *bullets]).lower()
+
+    if any(x in text for x in ("bảng số liệu", "bảng dữ liệu", "bảng thống kê")):
+        return ["data-table", "evidence-board", "comparison-2-column"]
+    if any(x in text for x in ("biểu đồ", "đồ thị", "chart")):
+        return ["chart-focus", "evidence-board", "split-visual-explain"]
+    if any(x in text for x in ("nguyên nhân", "kết quả", "hệ quả", "tác động", "ảnh hưởng", "dẫn đến")):
+        return ["cause-effect", "evidence-board", "comparison-2-column"]
+    if any(x in text for x in ("so sánh", "đối chiếu", "giống nhau", "khác nhau")):
+        return ["comparison-2-column", "evidence-board", "split-visual-explain"]
+    if any(x in text for x in ("quá trình", "quy trình", "trình tự", "giai đoạn", "các bước")):
+        return ["process-timeline", "sequence-workspace", "cause-effect"]
+    if any(x in text for x in ("bản đồ", "lược đồ", "atlat", "atlas", "xác định vị trí", "phân bố")):
+        return ["map-focus", "annotated-visual", "zoom-detail", "split-visual-explain"]
+    if any(x in text for x in ("cấu tạo", "đặc điểm", "bộ phận", "quan sát", "hình ảnh", "chi tiết")):
+        return ["annotated-visual", "zoom-detail", "split-visual-explain", "visual-left-text-right"]
+    if any(x in text for x in ("kinh tuyến", "vĩ tuyến", "tọa độ", "toạ độ", "kinh độ", "vĩ độ")):
+        return ["annotated-visual", "comparison-2-column", "zoom-detail", "concept-map"]
+
+    fallback = {
+        "map-focus": ["annotated-visual", "split-visual-explain", "zoom-detail", "evidence-board"],
+        "annotated-visual": ["split-visual-explain", "zoom-detail", "visual-left-text-right", "center-focus"],
+        "split-visual-explain": ["text-left-visual-right", "visual-left-text-right", "evidence-board", "annotated-visual"],
+        "comparison-2-column": ["evidence-board", "text-left-visual-right", "cause-effect", "center-focus"],
+        "evidence-board": ["comparison-2-column", "visual-left-text-right", "concept-map", "center-focus"],
+        "process-timeline": ["sequence-workspace", "cause-effect", "evidence-board", "center-focus"],
+        "cause-effect": ["process-timeline", "comparison-2-column", "evidence-board", "concept-map"],
+        "quiz-card": ["evidence-choice", "question-spotlight", "activity-board"],
+        "question-spotlight": ["quiz-card", "evidence-choice", "scenario-stage"],
+        "activity-board": ["matching-workspace", "sequence-workspace", "quiz-card"],
+        "center-focus": ["visual-left-text-right", "text-left-visual-right", "evidence-board", "annotated-visual"],
+    }
+    return fallback.get(
+        current,
+        ["annotated-visual", "split-visual-explain", "comparison-2-column", "evidence-board", "center-focus"],
+    )
+
+
+def rebalance_lesson_layouts(lesson_draft: Any) -> Any:
+    """Deck-level diversity gate: pedagogical variety must survive section-level generation."""
+    slides = list(getattr(lesson_draft, "slides", []) or [])
+    if len(slides) < 4:
+        return lesson_draft
+
+    import math
+    from collections import Counter
+
+    layouts = [
+        _clean(str(getattr(slide, "layout_hint", ""))) or "center-focus"
+        for slide in slides
+    ]
+    counts = Counter(layouts)
+    allowed = max(3, math.ceil(len(slides) * 0.25))
+    repaired: list[Any] = []
+    recent: list[str] = []
+
+    map_cues = (
+        "bản đồ", "lược đồ", "atlat", "atlas", "xác định vị trí",
+        "quan sát bản đồ", "quan sát lược đồ", "đọc bản đồ",
+        "khai thác bản đồ", "phân bố", "vị trí địa lí", "vị trí địa lý",
+    )
+
+    for index, slide in enumerate(slides):
+        current = layouts[index]
+        title = _clean(str(getattr(slide, "title", "")))
+        bullets = _existing_bullets(slide)
+        semantic = " ".join([title, *bullets]).lower()
+
+        invalid_map = current == "map-focus" and not any(cue in semantic for cue in map_cues)
+        repeated_three = len(recent) >= 2 and recent[-1] == recent[-2] == current
+        globally_overused = counts[current] > allowed
+
+        if invalid_map or repeated_three or globally_overused:
+            candidates = _semantic_layout_candidates(slide, current)
+            if invalid_map:
+                candidates = [x for x in candidates if x != "map-focus"]
+
+            chosen = current
+            ranked = sorted(
+                dict.fromkeys(candidates),
+                key=lambda layout: (
+                    1 if layout in recent[-2:] else 0,
+                    counts.get(layout, 0),
+                    1 if layout == current else 0,
+                ),
+            )
+            for candidate in ranked:
+                if candidate == current:
+                    continue
+                if counts.get(candidate, 0) >= allowed:
+                    continue
+                chosen = candidate
+                break
+
+            if chosen != current:
+                counts[current] -= 1
+                counts[chosen] += 1
+                metadata = dict(getattr(slide, "metadata", {}) or {})
+                v2_meta = dict(metadata.get("elearning_v2", {}) or {})
+                v2_meta["layout_family"] = chosen
+                v2_meta["visual_family"] = _layout_visual(chosen)
+                v2_meta["layout_reason"] = "deck-diversity-repair"
+                metadata["elearning_v2"] = v2_meta
+                design = {
+                    "layout": chosen,
+                    "visual": _layout_visual(chosen),
+                    "motion": v2_meta.get("motion_pattern", "progressive-reveal"),
+                }
+                slide = _copy(slide, {
+                    "layout_hint": chosen,
+                    "visual_type": design["visual"],
+                    "visual_description": _visual_direction_text(design, title, bullets),
+                    "metadata": metadata,
+                })
+                current = chosen
+
+        recent.append(current)
+        repaired.append(slide)
+
+    final_layouts = [
+        _clean(str(getattr(slide, "layout_hint", ""))) or "center-focus"
+        for slide in repaired
+    ]
+    final_counts = Counter(final_layouts)
+    unique_count = len(final_counts)
+
+    warnings = list(getattr(lesson_draft, "warnings", []) or [])
+    warnings.append(
+        "Đa dạng bố cục toàn bài: "
+        f"{unique_count} layout / {len(repaired)} slide; "
+        f"layout dùng nhiều nhất {final_counts.most_common(1)[0][0]}="
+        f"{final_counts.most_common(1)[0][1]} slide."
+    )
+    return _copy(lesson_draft, {"slides": repaired, "warnings": warnings})
