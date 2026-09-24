@@ -402,7 +402,11 @@ def _enhance_interaction(slide: Any, section_key: str, plan_section: dict[str, A
     ids = _source_ids(slide, plan_section)
     should_assess = section_key.startswith("interaction_") or section_key == "practice"
 
-    if current is None and should_assess:
+    metadata = dict(getattr(slide, "metadata", {}) or {})
+    local_fallback = bool(metadata.get("local_fallback"))
+    force_practice_rotation = section_key == "practice" and local_fallback
+
+    if (current is None and should_assess) or force_practice_rotation:
         bullets = _existing_bullets(slide)
         title = _clean(str(getattr(slide, "title", ""))) or "nội dung bài học"
         current = _fallback_interaction(
