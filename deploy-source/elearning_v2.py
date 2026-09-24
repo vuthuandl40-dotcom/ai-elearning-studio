@@ -397,21 +397,44 @@ def _enhance_interaction(slide: Any, section_key: str, plan_section: dict[str, A
 
 
 
-def _design_profile(section_key: str, slide_index: int, current_visual: str, title: str, bullets: list[str]) -> dict[str, str]:
-    """Choose a pedagogically appropriate composition while preventing visual monotony."""
+def _design_profile(
+    section_key: str,
+    slide_index: int,
+    current_visual: str,
+    title: str,
+    bullets: list[str],
+    *,
+    interaction_type: str = "",
+    previous_layouts: list[str] | None = None,
+) -> dict[str, str]:
+    """Choose a source-safe semantic composition and actively avoid layout monotony."""
     key = section_key or ""
     current = _clean(current_visual).lower()
     semantic_text = " ".join([title, *bullets]).lower()
+    previous_layouts = previous_layouts or []
 
-    # Pedagogical role always wins over a writer's visual suggestion.
+    def choose(family: list[tuple[str, str, str]], seed: int = 0) -> dict[str, str]:
+        if not family:
+            return {"layout": "center-focus", "visual": "infographic", "motion": "center-reveal"}
+        start_index = seed % len(family)
+        ordered = family[start_index:] + family[:start_index]
+        # Never repeat the same layout three times; prefer a layout not used
+        # immediately before and then one with the lowest section-local count.
+        recent = previous_layouts[-2:]
+        candidates = [item for item in ordered if not (len(recent) == 2 and recent[0] == recent[1] == item[0])]
+        if not candidates:
+            candidates = ordered
+        min_count = min(previous_layouts.count(item[0]) for item in candidates)
+        candidates = [item for item in candidates if previous_layouts.count(item[0]) == min_count]
+        layout, visual, motion = candidates[0]
+        return {"layout": layout, "visual": visual, "motion": motion}
+
+    # Pedagogical role has the highest priority.
     fixed_roles = {
         "introduction": ("cinematic-hero", "hero", "slow-zoom-title"),
         "objectives": ("milestone-checklist", "learning_objectives", "staggered-reveal"),
         "warmup": ("question-spotlight", "hook_visual", "question-pause"),
         "lead_in": ("scenario-stage", "scenario", "scene-reveal"),
-        "interaction_1": ("quiz-card", "quiz_ui", "choice-feedback"),
-        "interaction_2": ("fill-blank-focus", "quiz_ui", "blank-answer-feedback"),
-        "interaction_3": ("evidence-choice", "quiz_ui", "evidence-feedback"),
         "application": ("real-world-scenario", "scenario", "scenario-decision"),
         "summary": ("concept-map", "concept_map", "branch-reveal"),
         "closing": ("takeaway-cards", "takeaway", "card-reveal"),
@@ -421,24 +444,75 @@ def _design_profile(section_key: str, slide_index: int, current_visual: str, tit
         layout, visual, motion = fixed_roles[key]
         return {"layout": layout, "visual": visual, "motion": motion}
 
+    if key.startswith("interaction_"):
+        interaction_families = {
+            "fill_blank": [("fill-blank-focus", "quiz_ui", "blank-answer-feedback")],
+            "matching": [("matching-workspace", "matching_ui", "pair-reveal")],
+            "drag_drop": [("activity-board", "drag_drop_ui", "drag-feedback")],
+            "multiple_choice": [("evidence-choice", "quiz_ui", "evidence-feedback"), ("quiz-card", "quiz_ui", "choice-feedback")],
+            "single_choice": [("quiz-card", "quiz_ui", "choice-feedback"), ("evidence-choice", "quiz_ui", "evidence-feedback")],
+            "true_false": [("question-spotlight", "quiz_ui", "choice-feedback"), ("quiz-card", "quiz_ui", "choice-feedback")],
+        }
+        return choose(interaction_families.get(interaction_type, [("quiz-card", "quiz_ui", "choice-feedback")]), slide_index)
+
     if key == "practice":
-        layouts = [
-            ("activity-board", "practice_board", "task-reveal"),
-            ("matching-workspace", "matching_ui", "pair-reveal"),
-            ("sequence-workspace", "sequence_ui", "step-reveal"),
-        ]
-        layout, visual, motion = layouts[slide_index % len(layouts)]
-        return {"layout": layout, "visual": visual, "motion": motion}
+        interaction_families = {
+            "matching": [
+                ("matching-workspace", "matching_ui", "pair-reveal"),
+                ("activity-board", "practice_board", "task-reveal"),
+            ],
+            "drag_drop": [
+                ("activity-board", "drag_drop_ui", "drag-feedback"),
+                ("sequence-workspace", "sequence_ui", "step-reveal"),
+            ],
+            "fill_blank": [
+                ("fill-blank-focus", "quiz_ui", "blank-answer-feedback"),
+                ("activity-board", "practice_board", "task-reveal"),
+            ],
+        }
+        return choose(
+            interaction_families.get(
+                interaction_type,
+                [
+                    ("activity-board", "practice_board", "task-reveal"),
+                    ("matching-workspace", "matching_ui", "pair-reveal"),
+                    ("sequence-workspace", "sequence_ui", "step-reveal"),
+                ],
+            ),
+            slide_index,
+        )
 
     explore_offsets = {"explore_1": 0, "explore_2": 1, "explore_3": 2}
-    offset = explore_offsets.get(key, 0)
-    semantic_index = slide_index + offset
+    semantic_index = slide_index + explore_offsets.get(key, 0)
 
-    # Specialized visual families are allowed only inside knowledge-exploration
-    # screens, and each family deliberately rotates several compositions.
-    semantic_families = [
+    # Explicit semantic families. Order matters: a data table is not a chart,
+    # and coordinates are not automatically a map task.
+    families: list[tuple[tuple[str, ...], list[tuple[str, str, str]]]] = [
         (
-            "comparison",
+            ("bảng số liệu", "bảng dữ liệu", "dữ liệu bảng", "table", "bảng thống kê"),
+            [
+                ("data-table", "table", "row-reveal"),
+                ("evidence-board", "table", "card-reveal"),
+                ("comparison-2-column", "table", "paired-reveal"),
+            ],
+        ),
+        (
+            ("biểu đồ", "chart", "đồ thị", "biểu đồ cột", "biểu đồ tròn", "biểu đồ đường", "cơ cấu"),
+            [
+                ("chart-focus", "chart", "progressive-reveal"),
+                ("evidence-board", "chart", "card-reveal"),
+                ("split-visual-explain", "chart", "left-right-reveal"),
+            ],
+        ),
+        (
+            ("nguyên nhân", "kết quả", "hệ quả", "tác động", "ảnh hưởng", "dẫn đến", "cause", "effect"),
+            [
+                ("cause-effect", "cause_effect_diagram", "connector-reveal"),
+                ("comparison-2-column", "cause_effect_diagram", "paired-reveal"),
+                ("evidence-board", "evidence_cards", "card-reveal"),
+            ],
+        ),
+        (
             ("so sánh", "khác nhau", "giống nhau", "đối chiếu", "compare", "versus"),
             [
                 ("comparison-2-column", "comparison", "paired-reveal"),
@@ -447,88 +521,107 @@ def _design_profile(section_key: str, slide_index: int, current_visual: str, tit
             ],
         ),
         (
-            "chart",
-            ("biểu đồ", "số liệu", "tỉ lệ", "tỷ lệ", "phần trăm", "tăng", "giảm", "chart"),
+            ("trình tự", "giai đoạn", "quá trình", "các bước", "quy trình", "timeline", "sequence"),
             [
-                ("chart-focus", "chart", "progressive-reveal"),
-                ("evidence-board", "chart", "card-reveal"),
-                ("split-visual-explain", "chart", "left-right-reveal"),
+                ("process-timeline", "process_diagram", "step-reveal"),
+                ("sequence-workspace", "sequence_ui", "step-reveal"),
+                ("cause-effect", "cause_effect_diagram", "connector-reveal"),
             ],
         ),
         (
-            "table",
-            ("bảng số liệu", "bảng dữ liệu", "dữ liệu bảng", "table"),
-            [
-                ("data-table", "table", "row-reveal"),
-                ("evidence-board", "table", "card-reveal"),
-                ("comparison-2-column", "table", "paired-reveal"),
-            ],
-        ),
-        (
-            "timeline",
-            ("trình tự", "giai đoạn", "quá trình", "các bước", "timeline", "sequence"),
-            [
-                ("process-timeline", "timeline", "step-reveal"),
-                ("cause-effect", "timeline", "connector-reveal"),
-                ("sequence-workspace", "timeline", "step-reveal"),
-            ],
-        ),
-        (
-            "map",
-            ("bản đồ", "lược đồ", "kinh tuyến", "vĩ tuyến", "tọa độ", "toạ độ", "xác định vị trí", "latitude", "longitude"),
-            [
-                ("map-focus", "map", "progressive-reveal"),
-                ("annotated-visual", "map", "hotspot-reveal"),
-                ("split-visual-explain", "map", "left-right-reveal"),
-                ("zoom-detail", "map", "zoom-and-label"),
-            ],
-        ),
-        (
-            "concept_map",
-            ("sơ đồ tư duy", "khái niệm", "mối quan hệ", "concept map"),
+            ("sơ đồ tư duy", "mối quan hệ", "sơ đồ khái niệm", "concept map"),
             [
                 ("concept-map", "concept_map", "branch-reveal"),
-                ("cause-effect", "concept_map", "connector-reveal"),
                 ("evidence-board", "concept_map", "card-reveal"),
+                ("cause-effect", "concept_map", "connector-reveal"),
+            ],
+        ),
+        (
+            ("cấu tạo", "đặc điểm", "bộ phận", "quan sát hình", "hình ảnh", "chú giải", "chi tiết"),
+            [
+                ("annotated-visual", "annotated_image", "hotspot-reveal"),
+                ("zoom-detail", "closeup_diagram", "zoom-and-label"),
+                ("split-visual-explain", "educational_illustration", "left-right-reveal"),
             ],
         ),
     ]
 
     if key in explore_offsets:
-        for visual_key, cues, family in semantic_families:
-            if (current == visual_key or any(cue in semantic_text for cue in cues)) and any(cue in semantic_text for cue in cues):
-                layout, visual, motion = family[semantic_index % len(family)]
-                return {"layout": layout, "visual": visual, "motion": motion}
+        for cues, family in families:
+            if any(cue in semantic_text for cue in cues):
+                return choose(family, semantic_index)
 
-    # General exploration families are intentionally different for each
-    # knowledge block, with an offset so section boundaries do not repeat.
+        # A map layout requires an actual map-oriented learning action or an
+        # explicit map/atlas/diagram source cue. Subject vocabulary such as
+        # "kinh tuyến", "vĩ tuyến", "tọa độ" alone is NOT sufficient.
+        map_objects = ("bản đồ", "lược đồ", "atlat", "atlas")
+        map_actions = (
+            "xác định vị trí", "chỉ trên", "quan sát bản đồ", "quan sát lược đồ",
+            "đọc bản đồ", "khai thác bản đồ", "phân bố", "khu vực", "vị trí địa lí",
+            "vị trí địa lý",
+        )
+        explicit_map = any(cue in semantic_text for cue in map_objects)
+        map_task = explicit_map or (
+            current == "map" and any(cue in semantic_text for cue in map_actions)
+        )
+        if map_task:
+            map_family = [
+                ("map-focus", "map", "progressive-reveal"),
+                ("annotated-visual", "map", "hotspot-reveal"),
+                ("split-visual-explain", "map", "left-right-reveal"),
+                ("zoom-detail", "map", "zoom-and-label"),
+            ]
+            # map-focus itself is capped at one use per section; later map
+            # screens rotate to annotation/zoom/explanation compositions.
+            if "map-focus" in previous_layouts:
+                map_family = [item for item in map_family if item[0] != "map-focus"]
+            return choose(map_family, semantic_index)
+
+        # Geography concepts that mention coordinates/longitude/latitude but
+        # are explanatory rather than map-reading should use concept/diagram
+        # layouts instead of pretending every screen is a map.
+        geo_concepts = ("kinh tuyến", "vĩ tuyến", "tọa độ", "toạ độ", "kinh độ", "vĩ độ", "latitude", "longitude")
+        if any(cue in semantic_text for cue in geo_concepts):
+            return choose(
+                [
+                    ("annotated-visual", "diagram", "hotspot-reveal"),
+                    ("comparison-2-column", "comparison", "paired-reveal"),
+                    ("zoom-detail", "closeup_diagram", "zoom-and-label"),
+                    ("concept-map", "concept_map", "branch-reveal"),
+                ],
+                semantic_index,
+            )
+
+    # General exploration palettes deliberately differ by knowledge block.
     if key == "explore_1":
-        layouts = [
+        family = [
             ("annotated-visual", "annotated_image", "hotspot-reveal"),
             ("split-visual-explain", "educational_illustration", "left-right-reveal"),
             ("zoom-detail", "closeup_diagram", "zoom-and-label"),
+            ("center-focus", "infographic", "center-reveal"),
         ]
     elif key == "explore_2":
-        layouts = [
+        family = [
             ("comparison-2-column", "comparison", "paired-reveal"),
             ("evidence-board", "evidence_cards", "card-reveal"),
             ("text-left-visual-right", "educational_illustration", "right-focus"),
+            ("annotated-visual", "annotated_image", "hotspot-reveal"),
         ]
     elif key == "explore_3":
-        layouts = [
+        family = [
             ("process-timeline", "process_diagram", "step-reveal"),
             ("cause-effect", "cause_effect_diagram", "connector-reveal"),
             ("full-bleed-annotated", "annotated_image", "pan-and-label"),
+            ("visual-left-text-right", "educational_illustration", "left-right-reveal"),
         ]
     else:
-        layouts = [
+        family = [
             ("visual-left-text-right", "educational_illustration", "left-right-reveal"),
             ("text-left-visual-right", "educational_illustration", "right-focus"),
             ("center-focus", "infographic", "center-reveal"),
+            ("evidence-board", "evidence_cards", "card-reveal"),
         ]
-
-    layout, visual, motion = layouts[semantic_index % len(layouts)]
-    return {"layout": layout, "visual": visual, "motion": motion}
+    return choose(family, semantic_index)
 
 
 def _visual_direction_text(design: dict[str, str], title: str, bullets: list[str]) -> str:
@@ -565,13 +658,17 @@ def enrich_section_v2(section_draft: Any, *, plan_section: dict[str, Any], chunk
             student = _student_action(profile, title)
         script = _teacher_script(str(getattr(slide, "teacher_script", "")), title, question, profile, bullets)
         interaction = _enhance_interaction(slide, section_key, plan_section, chunks_by_id)
+        interaction_type = str(getattr(interaction, "interaction_type", "") or "")
         design = _design_profile(
             section_key,
             index,
             str(getattr(slide, "visual_type", "") or ""),
             title,
             bullets,
+            interaction_type=interaction_type,
+            previous_layouts=used_layouts,
         )
+        used_layouts.append(design["layout"])
         metadata = dict(getattr(slide, "metadata", {}) or {})
         metadata["elearning_v2"] = {
             "version": V2_VERSION,
@@ -591,7 +688,7 @@ def enrich_section_v2(section_draft: Any, *, plan_section: dict[str, Any], chunk
             "scored_interaction": interaction is not None,
             "layout_family": design["layout"],
             "visual_family": design["visual"],
-            "motion_pattern": design["motion"],
+            "motion_pattern": design["motion"],\n            "layout_reason": f"{section_key}:{design['visual']}",\n            "semantic_role": profile["purpose"],
         }
         enriched.append(_copy(slide, {
             "onscreen_text": bullets or getattr(slide, "onscreen_text", []),
