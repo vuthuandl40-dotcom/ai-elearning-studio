@@ -824,3 +824,61 @@ if(!mp4Storyboard.includes("exportMp4")){
   );
 }
 fs.writeFileSync(mp4StoryboardPath,mp4Storyboard);
+
+
+const semanticSlideStagePath=path.join(root,"frontend/components/editor/SlideStage.tsx");
+let semanticSlideStage=fs.readFileSync(semanticSlideStagePath,"utf8");
+if(!semanticSlideStage.includes("const renderSemanticBody =")){
+  const patchMarker='  const patchElement = (id: string, patch: Partial<DesignElement>) => {';
+  const helpers=`  const layoutKey = design.layout_key || slide.layout_hint || "text_visual";
+  const firstHalf = bullets.slice(0, Math.max(1, Math.ceil(bullets.length / 2)));
+  const secondHalf = bullets.slice(Math.max(1, Math.ceil(bullets.length / 2)));
+
+  const renderSemanticBody = () => {
+    if (!bullets.length) return <p className="text-xs italic" style={{ color: theme.tokens.muted }}>Chưa có nội dung.</p>;
+    if (["process-timeline","sequence-workspace"].includes(layoutKey)) return <div className="grid h-full grid-cols-2 gap-2 sm:grid-cols-3">{bullets.slice(0,6).map((item,i)=><div key={i} className="relative rounded-xl border bg-white/80 p-2.5 shadow-sm"><div className="mb-1 grid h-6 w-6 place-items-center rounded-full text-[10px] font-black text-white" style={{backgroundColor:theme.tokens.accent}}>{i+1}</div><div className="text-[clamp(8px,.9vw,13px)] font-semibold leading-snug" style={{color:theme.tokens.text}}>{item}</div></div>)}</div>;
+    if (["comparison-2-column","cause-effect","matching-workspace"].includes(layoutKey)) return <div className="space-y-2">{firstHalf.map((item,i)=><div key={i} className="rounded-xl border bg-white/85 p-2.5 text-[clamp(8px,.9vw,13px)] font-semibold shadow-sm" style={{color:theme.tokens.text,borderColor:theme.tokens.accentSoft}}>{layoutKey==="cause-effect"?"Nguyên nhân · ":layoutKey==="matching-workspace"?"A"+(i+1)+" · ":"Vế A · "}{item}</div>)}</div>;
+    if (["quiz-card","evidence-choice","fill-blank-focus"].includes(layoutKey)) return <div className="grid gap-2 sm:grid-cols-2">{bullets.slice(0,6).map((item,i)=><div key={i} className="rounded-xl border bg-white/90 p-2.5 text-[clamp(8px,.9vw,13px)] font-bold shadow-sm" style={{color:theme.tokens.text,borderColor:theme.tokens.accentSoft}}><span className="mr-2 inline-grid h-5 w-5 place-items-center rounded-md text-[9px] text-white" style={{backgroundColor:theme.tokens.accent}}>{String.fromCharCode(65+i)}</span>{layoutKey==="fill-blank-focus"&&i===0?"_____ ":null}{item}</div>)}</div>;
+    if (["takeaway-cards","milestone-checklist","activity-board","evidence-board"].includes(layoutKey)) return <div className="grid h-full grid-cols-2 gap-2">{bullets.slice(0,6).map((item,i)=><div key={i} className="rounded-xl border bg-white/85 p-2.5 shadow-sm"><div className="mb-1 text-[9px] font-black uppercase tracking-wider" style={{color:theme.tokens.accent}}>{layoutKey==="milestone-checklist"?"✓ Mục tiêu":layoutKey==="takeaway-cards"?"Ghi nhớ":"Ý "+(i+1)}</div><div className="text-[clamp(8px,.85vw,12px)] leading-snug" style={{color:theme.tokens.text}}>{item}</div></div>)}</div>;
+    if (layoutKey==="concept-map") return <div className="grid h-full grid-cols-2 gap-2">{bullets.slice(0,6).map((item,i)=><div key={i} className="flex items-center justify-center rounded-full border px-3 text-center text-[clamp(8px,.8vw,12px)] font-semibold shadow-sm" style={{backgroundColor:i%2?theme.tokens.surface:theme.tokens.accentSoft,color:theme.tokens.text,borderColor:theme.tokens.accentSoft}}>{item}</div>)}</div>;
+    if (layoutKey==="data-table") return <div className="overflow-hidden rounded-xl border bg-white/90">{bullets.slice(0,7).map((item,i)=><div key={i} className="grid grid-cols-[30px_1fr] border-b last:border-b-0"><div className="grid place-items-center text-[9px] font-black" style={{backgroundColor:theme.tokens.accentSoft,color:theme.tokens.accent}}>{i+1}</div><div className="p-2 text-[clamp(8px,.85vw,12px)]" style={{color:theme.tokens.text}}>{item}</div></div>)}</div>;
+    if (layoutKey==="source-list") return <div className="space-y-1.5">{bullets.slice(0,7).map((item,i)=><div key={i} className="flex gap-2 rounded-lg bg-white/80 p-2 text-[clamp(8px,.8vw,12px)]"><span style={{color:theme.tokens.accent}}>▣</span><span style={{color:theme.tokens.text}}>{item}</span></div>)}</div>;
+    return <ul className="space-y-2 text-[clamp(9px,1vw,15px)] leading-relaxed" style={{ color: theme.tokens.text }}>{bullets.slice(0,7).map((item,i)=><li key={i} className="flex gap-2"><span className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full" style={{backgroundColor:theme.tokens.accent}}/><span>{item}</span></li>)}</ul>;
+  };
+
+  const renderSemanticVisualFallback = () => {
+    if (layoutKey==="map-focus") return <div className="relative h-full w-full overflow-hidden rounded-xl" style={{background:`linear-gradient(135deg,${theme.tokens.accentSoft},${theme.tokens.surface})`}}><div className="absolute inset-0 opacity-30" style={{backgroundImage:"linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)",backgroundSize:"12% 16%",color:theme.tokens.accent}}/><div className="absolute left-[16%] top-[25%] text-2xl">📍</div><div className="absolute left-[54%] top-[48%] text-2xl">📍</div><div className="absolute right-[13%] top-[18%] text-xl">🧭</div><div className="absolute bottom-3 left-3 rounded-lg bg-white/85 px-3 py-1 text-[10px] font-black" style={{color:theme.tokens.accent}}>BẢN ĐỒ / LƯỢC ĐỒ</div></div>;
+    if (["annotated-visual","zoom-detail","full-bleed-annotated","split-visual-explain"].includes(layoutKey)) return <div className="relative h-full w-full overflow-hidden rounded-xl" style={{background:`radial-gradient(circle at 35% 35%,${theme.tokens.accentSoft},${theme.tokens.surface} 65%)`}}><div className="absolute left-[18%] top-[20%] h-3 w-3 rounded-full ring-4 ring-white" style={{backgroundColor:theme.tokens.accent}}/><div className="absolute right-[17%] top-[42%] h-3 w-3 rounded-full ring-4 ring-white" style={{backgroundColor:theme.tokens.accent}}/><div className="absolute bottom-[18%] left-[42%] h-3 w-3 rounded-full ring-4 ring-white" style={{backgroundColor:theme.tokens.accent}}/><div className="absolute bottom-3 left-3 rounded-lg bg-white/85 px-3 py-1 text-[10px] font-black" style={{color:theme.tokens.accent}}>HÌNH ẢNH CÓ CHÚ GIẢI</div></div>;
+    if (layoutKey==="chart-focus") return <div className="flex h-full items-end justify-around gap-2 rounded-xl p-4" style={{backgroundColor:theme.tokens.surface}}>{[42,68,55,82,63].map((h,i)=><div key={i} className="w-[13%] rounded-t-lg" style={{height:h+"%",backgroundColor:i===3?theme.tokens.accent:theme.tokens.accentSoft,border:"1px solid "+theme.tokens.accent}}/>)}</div>;
+    if (["comparison-2-column","cause-effect","matching-workspace"].includes(layoutKey)) return <div className="space-y-2">{(secondHalf.length?secondHalf:firstHalf).map((item,i)=><div key={i} className="rounded-xl border bg-white/85 p-2.5 text-left text-[clamp(8px,.85vw,12px)] font-semibold shadow-sm" style={{color:theme.tokens.text,borderColor:theme.tokens.accentSoft}}>{layoutKey==="cause-effect"?"Kết quả · ":layoutKey==="matching-workspace"?"B"+(i+1)+" · ":"Vế B · "}{item}</div>)}</div>;
+    if (layoutKey==="concept-map") return <div className="relative grid h-full place-items-center"><div className="grid h-24 w-24 place-items-center rounded-full text-center text-xs font-black text-white shadow-lg" style={{backgroundColor:theme.tokens.accent}}>KHÁI NIỆM<br/>TRỌNG TÂM</div><div className="absolute left-[8%] top-[18%] h-px w-[28%]" style={{backgroundColor:theme.tokens.accent}}/><div className="absolute right-[8%] top-[68%] h-px w-[28%]" style={{backgroundColor:theme.tokens.accent}}/></div>;
+    if (["process-timeline","sequence-workspace"].includes(layoutKey)) return <div className="flex h-full items-center justify-between gap-1 px-2">{bullets.slice(0,5).map((_,i)=><div key={i} className="flex flex-1 items-center"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-black text-white" style={{backgroundColor:theme.tokens.accent}}>{i+1}</div>{i<Math.min(4,bullets.length-1)?<div className="h-1 flex-1" style={{backgroundColor:theme.tokens.accentSoft}}/>:null}</div>)}</div>;
+    return <div><div className="text-3xl">{slide.visual_type==="map"?"🗺️":slide.visual_type==="quiz_ui"?"🧩":slide.visual_type==="video_scene"?"🎬":"🖼️"}</div><div className="mt-2 text-[10px] font-black uppercase tracking-wider" style={{color:theme.tokens.accent}}>{slide.visual_type||"visual"}</div><div className="mt-1 line-clamp-5 text-[10px] leading-4" style={{color:theme.tokens.muted}}>{slide.visual_description||"Kéo media từ thư viện hoặc sinh từ prompt."}</div></div>;
+  };
+
+  const renderSemanticQuestion = () => {
+    if (!guiding) return null;
+    const strong=["question-spotlight","quiz-card","fill-blank-focus","evidence-choice","real-world-scenario"].includes(layoutKey);
+    return <div className={strong?"w-full text-center text-[clamp(10px,1.25vw,18px)] font-black leading-snug":"w-full text-[clamp(8px,.9vw,13px)] font-semibold"}>💡 {guiding}</div>;
+  };
+
+`;
+  if(!semanticSlideStage.includes(patchMarker)) throw new Error("SlideStage patch marker missing");
+  semanticSlideStage=semanticSlideStage.replace(patchMarker,helpers+patchMarker);
+
+  const oldBody='    if (el.type === "body") return <div key={el.id} style={style} className={`${shell} p-1`} onPointerDown={(e) => pointerDown(e, el)}>{bullets.length ? <ul className="space-y-2 text-[clamp(9px,1vw,15px)] leading-relaxed" style={{ color: theme.tokens.text }}>{bullets.slice(0, 7).map((item, i) => <li key={i} className="flex gap-2"><span className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: theme.tokens.accent }} /><span>{item}</span></li>)}</ul> : <p className="text-xs italic" style={{ color: theme.tokens.muted }}>Chưa có nội dung.</p>}</div>;';
+  const newBody='    if (el.type === "body") return <div key={el.id} style={style} className={`${shell} p-1`} onPointerDown={(e) => pointerDown(e, el)}>{renderSemanticBody()}</div>;';
+  if(!semanticSlideStage.includes(oldBody)) throw new Error("SlideStage body renderer marker missing");
+  semanticSlideStage=semanticSlideStage.replace(oldBody,newBody);
+
+  const oldQuestion='    if (el.type === "question") return guiding ? <div key={el.id} style={{ ...style, background: theme.tokens.accentSoft, color: theme.tokens.text }} className={`${shell} flex items-center px-3 text-[clamp(8px,.9vw,13px)] font-semibold`} onPointerDown={(e) => pointerDown(e, el)}>💡 {guiding}</div> : null;';
+  const newQuestion='    if (el.type === "question") return guiding ? <div key={el.id} style={{ ...style, background: theme.tokens.accentSoft, color: theme.tokens.text }} className={`${shell} flex items-center px-3`} onPointerDown={(e) => pointerDown(e, el)}>{renderSemanticQuestion()}</div> : null;';
+  if(!semanticSlideStage.includes(oldQuestion)) throw new Error("SlideStage question renderer marker missing");
+  semanticSlideStage=semanticSlideStage.replace(oldQuestion,newQuestion);
+
+  const oldFallback='<div><div className="text-3xl">{slide.visual_type === "map" ? "🗺️" : slide.visual_type === "quiz_ui" ? "🧩" : slide.visual_type === "video_scene" ? "🎬" : "🖼️"}</div><div className="mt-2 text-[10px] font-black uppercase tracking-wider" style={{ color: theme.tokens.accent }}>{slide.visual_type || "visual"}</div><div className="mt-1 line-clamp-5 text-[10px] leading-4" style={{ color: theme.tokens.muted }}>{slide.visual_description || "Kéo media từ thư viện hoặc sinh từ prompt."}</div></div>';
+  if(!semanticSlideStage.includes(oldFallback)) throw new Error("SlideStage visual fallback marker missing");
+  semanticSlideStage=semanticSlideStage.replace(oldFallback,'{renderSemanticVisualFallback()}');
+
+  fs.writeFileSync(semanticSlideStagePath,semanticSlideStage);
+}
