@@ -154,3 +154,29 @@ _geo_family=[
 ]
 assert len({x["layout"] for x in _geo_family})>=3, _geo_family
 print("interaction-role-layout-precedence-ok", [x["layout"] for x in _geo_family])
+
+
+from app.services.visual_catalog import LAYOUTS as _VISUAL_LAYOUTS
+
+_required_v2_layouts = {
+    "cinematic-hero","milestone-checklist","question-spotlight","scenario-stage",
+    "quiz-card","fill-blank-focus","evidence-choice","real-world-scenario",
+    "concept-map","takeaway-cards","source-list","activity-board",
+    "matching-workspace","sequence-workspace","comparison-2-column",
+    "evidence-board","split-visual-explain","chart-focus","data-table",
+    "process-timeline","cause-effect","map-focus","annotated-visual",
+    "zoom-detail","full-bleed-annotated","visual-left-text-right",
+    "text-left-visual-right","center-focus",
+}
+_catalog_by_key={item["key"]:item for item in _VISUAL_LAYOUTS}
+_missing_layouts=sorted(_required_v2_layouts-set(_catalog_by_key))
+assert not _missing_layouts, f"V2 layout hints missing from visual catalog: {_missing_layouts}"
+_geometry_signatures={
+    tuple(sorted((name,tuple(box)) for name,box in _catalog_by_key[key]["elements"].items()))
+    for key in _required_v2_layouts
+}
+assert len(_geometry_signatures)>=24, f"V2 catalog geometry is too repetitive: {len(_geometry_signatures)} unique layouts"
+assert _catalog_by_key["map-focus"]["elements"]["visual"][2] >= 60
+assert _catalog_by_key["comparison-2-column"]["elements"]["body"] != _catalog_by_key["map-focus"]["elements"]["body"]
+assert _catalog_by_key["process-timeline"]["elements"]["visual"] != _catalog_by_key["annotated-visual"]["elements"]["visual"]
+print("v2-visual-catalog-regression-ok",len(_required_v2_layouts),"layouts",len(_geometry_signatures),"geometries")
