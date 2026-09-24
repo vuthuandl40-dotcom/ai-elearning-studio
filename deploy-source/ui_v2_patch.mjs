@@ -970,3 +970,20 @@ if(!previewTopBar.includes("Xem trước")){
   );
 }
 fs.writeFileSync(previewTopBarPath,previewTopBar);
+
+
+const masterNewCheck=fs.readFileSync(path.join(root,"frontend/app/projects/new/page.tsx"),"utf8");
+for(const token of [
+  "Bảng bảo toàn nội dung","CHỌN ĐẦU RA","eLearning tương tác","Video MP4",
+  "Giáo viên giảng bài","Hoạt hình 3D","Infographic","Tối giản hiện đại","Kết hợp"
+]){
+  if(!masterNewCheck.includes(token)) throw new Error("MASTER PROMPT create flow missing: "+token);
+}
+const masterPreviewCheck=fs.readFileSync(path.join(root,"frontend/app/projects/[projectId]/preview/page.tsx"),"utf8");
+for(const token of [
+  "STORYBOARD","NỘI DUNG","TƯƠNG TÁC","CÂU HỎI","LỜI THUYẾT MINH","HÌNH ẢNH",
+  "CHECK 1","CHECK 2","CHECK 3","CHECK 4","CHECK 5","Kiểm tra bài trước khi xuất"
+]){
+  if(!masterPreviewCheck.includes(token)) throw new Error("MASTER PROMPT preview missing: "+token);
+}
+console.log("MASTER PROMPT UI completeness ok");
