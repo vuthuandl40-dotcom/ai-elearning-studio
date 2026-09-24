@@ -61,6 +61,15 @@ jobs:
         run: |
           python -m compileall -q app alembic
           python -c 'import app.main; print("backend-import-ok")'
+      - name: Inspect rendered slide canvas
+        working-directory: src
+        run: |
+          echo "SLIDE_CANVAS_BEGIN"
+          sed -n '1,360p' frontend/components/editor/SlideCanvas.tsx
+          echo "SLIDE_CANVAS_END"
+          echo "SLIDE_LAYOUT_RENDERERS_BEGIN"
+          grep -RInE 'map-focus|comparison-2-column|annotated-visual|process-timeline|activity-board|question-spotlight|layout_hint' frontend/components frontend/app --exclude-dir=node_modules | head -n 420 || true
+          echo "SLIDE_LAYOUT_RENDERERS_END"
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
