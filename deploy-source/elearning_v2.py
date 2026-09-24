@@ -397,6 +397,74 @@ def _enhance_interaction(slide: Any, section_key: str, plan_section: dict[str, A
 
 
 
+def _knowledge_cycle_stage(section_key: str, slide_index: int, slide_count: int) -> str:
+    key = section_key or ""
+    if key.startswith("interaction_"):
+        return "TƯƠNG TÁC"
+    if key == "practice":
+        return "LUYỆN TẬP"
+    if key == "application":
+        return "VẬN DỤNG"
+    if key == "summary":
+        return "TỔNG KẾT"
+    if key not in {"explore_1", "explore_2", "explore_3"}:
+        return "DẪN DẮT"
+
+    count = max(1, slide_count)
+    if count == 1:
+        return "QUAN SÁT"
+    if count == 2:
+        return ["QUAN SÁT", "KẾT LUẬN"][slide_index % 2]
+    if count == 3:
+        return ["GỢI VẤN ĐỀ", "GIẢI THÍCH", "KIỂM TRA"][slide_index % 3]
+    if count == 4:
+        return ["GỢI VẤN ĐỀ", "QUAN SÁT", "GIẢI THÍCH", "KẾT LUẬN"][slide_index % 4]
+    if count == 5:
+        return ["GỢI VẤN ĐỀ", "QUAN SÁT", "SUY NGHĨ", "GIẢI THÍCH", "KIỂM TRA"][slide_index % 5]
+    cycle = ["GỢI VẤN ĐỀ", "QUAN SÁT", "TƯƠNG TÁC", "SUY NGHĨ", "GIẢI THÍCH", "KẾT LUẬN", "KIỂM TRA"]
+    return cycle[slide_index % len(cycle)]
+
+
+def _cycle_layout_candidates(stage: str) -> list[tuple[str, str, str]]:
+    return {
+        "GỢI VẤN ĐỀ": [
+            ("question-spotlight", "hook_visual", "question-pause"),
+            ("scenario-stage", "scenario", "scene-reveal"),
+            ("full-bleed-annotated", "annotated_image", "pan-and-label"),
+        ],
+        "QUAN SÁT": [
+            ("annotated-visual", "annotated_image", "hotspot-reveal"),
+            ("zoom-detail", "closeup_diagram", "zoom-and-label"),
+            ("split-visual-explain", "educational_illustration", "left-right-reveal"),
+        ],
+        "TƯƠNG TÁC": [
+            ("evidence-choice", "quiz_ui", "evidence-feedback"),
+            ("activity-board", "practice_board", "task-reveal"),
+            ("matching-workspace", "matching_ui", "pair-reveal"),
+        ],
+        "SUY NGHĨ": [
+            ("evidence-board", "evidence_cards", "card-reveal"),
+            ("comparison-2-column", "comparison", "paired-reveal"),
+            ("text-left-visual-right", "educational_illustration", "right-focus"),
+        ],
+        "GIẢI THÍCH": [
+            ("split-visual-explain", "educational_illustration", "left-right-reveal"),
+            ("cause-effect", "cause_effect_diagram", "connector-reveal"),
+            ("process-timeline", "process_diagram", "step-reveal"),
+        ],
+        "KẾT LUẬN": [
+            ("concept-map", "concept_map", "branch-reveal"),
+            ("takeaway-cards", "takeaway", "card-reveal"),
+            ("center-focus", "infographic", "center-reveal"),
+        ],
+        "KIỂM TRA": [
+            ("quiz-card", "quiz_ui", "choice-feedback"),
+            ("evidence-choice", "quiz_ui", "evidence-feedback"),
+            ("question-spotlight", "quiz_ui", "question-pause"),
+        ],
+    }.get(stage, [])
+
+
 def _design_profile(
     section_key: str,
     slide_index: int,
@@ -406,6 +474,7 @@ def _design_profile(
     *,
     interaction_type: str = "",
     previous_layouts: list[str] | None = None,
+    cycle_stage: str = "",
 ) -> dict[str, str]:
     """Choose a source-safe semantic composition and actively avoid layout monotony."""
     key = section_key or ""
@@ -484,6 +553,8 @@ def _design_profile(
 
     explore_offsets = {"explore_1": 0, "explore_2": 1, "explore_3": 2}
     semantic_index = slide_index + explore_offsets.get(key, 0)
+
+    cycle_family = _cycle_layout_candidates(cycle_stage)
 
     # Explicit semantic families. Order matters: a data table is not a chart,
     # and coordinates are not automatically a map task.
@@ -591,6 +662,9 @@ def _design_profile(
                 ],
                 semantic_index,
             )
+
+    if key in explore_offsets and cycle_family:
+        return choose(cycle_family, semantic_index)
 
     # General exploration palettes deliberately differ by knowledge block.
     if key == "explore_1":
