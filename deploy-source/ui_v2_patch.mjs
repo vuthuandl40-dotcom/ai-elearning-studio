@@ -928,3 +928,30 @@ if(!preservationMap.includes("const preservationRows = useMemo")){
   );
 }
 fs.writeFileSync(preservationMapPath,preservationMap);
+
+
+const masterOutputModePath=path.join(root,"frontend/app/projects/new/page.tsx");
+let masterOutputMode=fs.readFileSync(masterOutputModePath,"utf8");
+if(!masterOutputMode.includes('const [outputMode,setOutputMode]')){
+  masterOutputMode=masterOutputMode.replace(
+    '  const [progress, setProgress] = useState<BackgroundJob | null>(null);',
+    '  const [progress, setProgress] = useState<BackgroundJob | null>(null);\n  const [outputMode,setOutputMode] = useState<"elearning"|"video"|"both">("both");'
+  );
+
+  const styleAnchor='<div className="sm:col-span-2"><Field label="Tổ chức / trường">';
+  if(masterOutputMode.includes(styleAnchor)){
+    masterOutputMode=masterOutputMode.replace(
+      styleAnchor,
+      '<div className="sm:col-span-2"><div className="mb-1.5 text-[11px] font-black text-slate-600">CHỌN ĐẦU RA</div><div className="grid gap-2 sm:grid-cols-3">{([["elearning","🎓 eLearning tương tác","HTML5 / SCORM · tương tác · chấm điểm"],["video","🎬 Video MP4","1920×1080 · 16:9 · giọng Việt"],["both","✦ Cả hai","eLearning + Video từ cùng storyboard"]] as const).map(([value,label,desc])=><button type="button" key={value} disabled={!!project} onClick={()=>setOutputMode(value)} className={"rounded-xl border p-3 text-left transition "+(outputMode===value?"border-indigo-400 bg-indigo-50 ring-1 ring-indigo-100":"border-slate-200 bg-white hover:border-indigo-200")}><span className="block text-xs font-black text-slate-800">{label}</span><span className="mt-1 block text-[10px] leading-4 text-slate-400">{desc}</span></button>)}</div></div><div className="sm:col-span-2"><div className="mb-1.5 text-[11px] font-black text-slate-600">PHONG CÁCH</div><div className="grid gap-2 sm:grid-cols-5">{["Giáo viên giảng bài","Hoạt hình 3D","Infographic","Tối giản hiện đại","Kết hợp"].map(style=><button type="button" key={style} disabled={!!project} onClick={()=>setForm({...form,visual_style:style})} className={"rounded-xl border px-3 py-2 text-[10px] font-black transition "+(form.visual_style===style?"border-violet-400 bg-violet-50 text-violet-700":"border-slate-200 bg-white text-slate-500 hover:border-violet-200")}>{style}</button>)}</div></div>'+styleAnchor
+    );
+  }
+
+  const doneNeedle='<button onClick={()=>location.href="/projects/"+project.id+"/editor"} className="mt-6 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-black text-white shadow-lg shadow-indigo-100">Mở trình chỉnh sửa →</button>';
+  if(masterOutputMode.includes(doneNeedle)){
+    masterOutputMode=masterOutputMode.replace(
+      doneNeedle,
+      '<div className="mt-6 flex flex-wrap justify-center gap-3"><button onClick={()=>location.href="/projects/"+project.id+"/editor"} className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700">✏ Mở trình chỉnh sửa</button>{(outputMode==="elearning"||outputMode==="both")&&<button onClick={()=>location.href="/projects/"+project.id+"/export"} className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-indigo-100">🎓 Xuất eLearning</button>}{(outputMode==="video"||outputMode==="both")&&<button onClick={()=>location.href="/projects/"+project.id+"/video"} className="rounded-xl bg-violet-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-violet-100">🎬 Storyboard & MP4</button>}</div>'
+    );
+  }
+}
+fs.writeFileSync(masterOutputModePath,masterOutputMode);
