@@ -12,6 +12,9 @@ RUN cat /tmp/runtime/runtime.b64.* | base64 -d > /tmp/runtime.zip \
  && cp -a /tmp/extracted/ai-elearning-studio-runtime/. /app/ \
  && rm -rf /tmp/runtime /tmp/runtime.zip /tmp/extracted
 
+COPY upgrade_v05.py /tmp/upgrade_v05.py
+RUN python /tmp/upgrade_v05.py && python -m py_compile /app/server.py && rm /tmp/upgrade_v05.py
+
 RUN pip install --no-cache-dir -r requirements.txt
 
 ENV PORT=8000
