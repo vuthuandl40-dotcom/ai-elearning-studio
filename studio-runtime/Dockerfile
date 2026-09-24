@@ -12,7 +12,10 @@ RUN cat /tmp/runtime/runtime.b64.* | base64 -d > /tmp/runtime.zip \
  && cp -a /tmp/extracted/ai-elearning-studio-runtime/. /app/ \
  && rm -rf /tmp/runtime /tmp/runtime.zip /tmp/extracted
 
-RUN pip install --no-cache-dir -r requirements.txt
+COPY db_persistence_patch.py /tmp/db_persistence_patch.py
+RUN python /tmp/db_persistence_patch.py && rm /tmp/db_persistence_patch.py
+
+RUN pip install --no-cache-dir -r requirements.txt "psycopg[binary]>=3.2,<4"
 
 ENV PORT=8000
 EXPOSE 8000
