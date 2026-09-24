@@ -184,8 +184,6 @@ print("v2-visual-catalog-regression-ok",len(_required_v2_layouts),"layouts",len(
 
 # Semantic slide-layout regression: layouts must follow the learning task,
 # not merely the subject vocabulary.
-from app.services.lesson_writer.v2 import _design_profile
-
 def _layout(title, bullets=None, visual="", index=0, previous=None, interaction_type=""):
     return _design_profile(
         "explore_1", index, visual, title, bullets or [],
