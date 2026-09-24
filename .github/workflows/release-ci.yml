@@ -73,6 +73,18 @@ jobs:
           echo "CATALOG_BEGIN"
           grep -RInE 'VisualCatalog|layouts|text_visual|map-focus|annotated-visual|comparison-2-column|process-timeline' app frontend --exclude-dir=node_modules | head -n 620 || true
           echo "CATALOG_END"
+      - name: Inspect slide layout engine
+        working-directory: src
+        run: |
+          echo "VISUAL_CATALOG_BEGIN"
+          sed -n '1,260p' app/services/visual_catalog.py
+          echo "VISUAL_CATALOG_END"
+          echo "LOCAL_WRITER_BEGIN"
+          sed -n '1,460p' app/services/lesson_writer/local_writer.py
+          echo "LOCAL_WRITER_END"
+          echo "OPENAI_WRITER_BEGIN"
+          sed -n '1,360p' app/services/lesson_writer/openai_client.py
+          echo "OPENAI_WRITER_END"
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
