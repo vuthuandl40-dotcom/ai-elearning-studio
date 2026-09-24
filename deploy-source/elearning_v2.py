@@ -246,6 +246,7 @@ def _fallback_interaction(
     facts: list[str],
     bullets: list[str],
     ids: list[str],
+    practice_variant: int = 0,
 ) -> InteractionBlueprint:
     pool: list[str] = []
     for value in [*facts, *bullets]:
@@ -296,44 +297,87 @@ def _fallback_interaction(
             source_chunk_ids=ids[:2],
         )
 
-    if section_key == "practice" and len(pool) >= 2:
-        pairs: list[tuple[str, str]] = []
-        for statement_item in pool[:4]:
-            words = statement_item.split()
-            if len(words) < 8:
-                continue
-            cut = max(3, min(len(words) - 3, len(words) // 2))
-            left = " ".join(words[:cut]).rstrip(" ,;:") + "…"
-            right = "… " + " ".join(words[cut:]).lstrip(" ,;:")
-            if left and right and all(left != old_left and right != old_right for old_left, old_right in pairs):
-                pairs.append((left, right))
-        if len(pairs) >= 2:
-            mapping = {left: right for left, right in pairs}
+    if section_key == "practice":
+        variant = practice_variant % 5
+
+        if variant == 1:
+            blank = _fill_blank_from_statement(statement)
+            if blank:
+                question_text, answer = blank
+                return InteractionBlueprint(
+                    interaction_type="fill_blank",
+                    question=f"Điền từ còn thiếu để hoàn thành ý đúng từ học liệu: “{question_text}”",
+                    options=[],
+                    correct_answer=answer,
+                    correct_feedback=f"🎉 Chính xác! Từ cần điền là “{answer}”.",
+                    incorrect_feedback="Chưa chính xác. Em hãy đọc lại ý gốc và chú ý từ khóa bị khuyết.",
+                    explanation=statement,
+                    difficulty="understand",
+                    points=1.0,
+                    settings={**base_settings, "hint": "Xem lại câu/ý trong học liệu có cấu trúc tương tự."},
+                    source_chunk_ids=ids[:2],
+                )
+
+        if variant in {0, 2} and len(pool) >= 2:
+            pairs: list[tuple[str, str]] = []
+            for statement_item in pool[:4]:
+                words = statement_item.split()
+                if len(words) < 8:
+                    continue
+                cut = max(3, min(len(words) - 3, len(words) // 2))
+                left = " ".join(words[:cut]).rstrip(" ,;:") + "…"
+                right = "… " + " ".join(words[cut:]).lstrip(" ,;:")
+                if left and right and all(left != old_left and right != old_right for old_left, old_right in pairs):
+                    pairs.append((left, right))
+            if len(pairs) >= 2:
+                mapping = {left: right for left, right in pairs}
+                interaction_type = "matching" if variant == 0 else "drag_drop"
+                return InteractionBlueprint(
+                    interaction_type=interaction_type,
+                    question=(
+                        f"Ghép hai vế để khôi phục các ý đúng từ học liệu về “{title}”."
+                        if interaction_type == "matching"
+                        else f"Kéo/chọn mỗi phần nội dung vào đúng vị trí để hoàn thành các ý về “{title}”."
+                    ),
+                    options=[{"left": left, "right": right} for left, right in pairs],
+                    correct_answer=mapping,
+                    correct_feedback="🎉 Chính xác! Em đã hoàn thành đúng theo nội dung học liệu.",
+                    incorrect_feedback="Chưa chính xác. Hãy đối chiếu ý nghĩa giữa các phần và thử lại.",
+                    explanation="Các cặp đều được tách trực tiếp từ nội dung nguồn của bài học.",
+                    difficulty="apply",
+                    points=1.0,
+                    settings={**base_settings, "hint": "Đọc trọn ý trong học liệu trước khi ghép hoặc kéo-thả."},
+                    source_chunk_ids=ids[:2],
+                )
+
+        if variant == 3 and len(pool) >= 2:
+            options = pool[:4]
             return InteractionBlueprint(
-                interaction_type="matching",
-                question=f"Ghép hai vế để khôi phục các ý đúng từ học liệu về “{title}”.",
-                options=[{"left": left, "right": right} for left, right in pairs],
-                correct_answer=mapping,
-                correct_feedback="Chính xác. Em đã ghép đúng các ý theo nội dung học liệu.",
-                incorrect_feedback="Chưa chính xác. Hãy đối chiếu ý nghĩa giữa hai vế và thử ghép lại.",
-                explanation="Các cặp đều được tách trực tiếp từ các ý xuất hiện trong nội dung bài học.",
-                difficulty="apply",
+                interaction_type="multiple_choice",
+                question=f"Chọn tất cả các ý xuất hiện trực tiếp trong nội dung luyện tập về “{title}”.",
+                options=options,
+                correct_answer=options,
+                correct_feedback="🎉 Chính xác! Em đã nhận diện đầy đủ các ý trong học liệu.",
+                incorrect_feedback="Chưa đủ hoặc có lựa chọn chưa phù hợp. Hãy đối chiếu từng phương án với học liệu rồi thử lại.",
+                explanation="Các phương án đúng đều được lấy trực tiếp từ nội dung bài học.",
+                difficulty="analyze",
                 points=1.0,
-                settings={**base_settings, "hint": "Đọc trọn ý trong học liệu rồi ghép phần mở đầu với phần kết thúc phù hợp."},
+                settings={**base_settings, "hint": "Đối chiếu từng phương án với nội dung nguồn, không chọn theo suy đoán."},
                 source_chunk_ids=ids[:2],
             )
-        options = pool[:4]
+
+        # variant 4, or fallback when source text cannot safely form the other types.
         return InteractionBlueprint(
-            interaction_type="multiple_choice",
-            question=f"Chọn các ý xuất hiện trực tiếp trong nội dung luyện tập về “{title}”.",
-            options=options,
-            correct_answer=options,
-            correct_feedback="Chính xác. Em đã nhận diện đầy đủ các ý có trong học liệu.",
-            incorrect_feedback="Chưa đủ hoặc có lựa chọn chưa phù hợp. Hãy đối chiếu từng phương án với học liệu rồi thử lại.",
-            explanation="Các phương án đúng đều được lấy trực tiếp từ nội dung màn hình/học liệu.",
+            interaction_type="true_false",
+            question=f"Dựa vào nội dung bài học, nhận định sau đúng hay sai? “{statement}”",
+            options=["Đúng", "Sai"],
+            correct_answer="Đúng",
+            correct_feedback=f"🎉 Chính xác! Nội dung trọng tâm là: {statement}",
+            incorrect_feedback="Chưa chính xác. Hãy xem lại học liệu, tìm từ khóa làm bằng chứng rồi thử lại.",
+            explanation=statement,
             difficulty="apply",
             points=1.0,
-            settings={**base_settings, "hint": "Đối chiếu từng phương án với nội dung vừa học; không chọn theo suy đoán."},
+            settings={**base_settings, "hint": "Tìm bằng chứng trực tiếp trong phần kiến thức vừa học."},
             source_chunk_ids=ids[:2],
         )
 
@@ -352,7 +396,7 @@ def _fallback_interaction(
     )
 
 
-def _enhance_interaction(slide: Any, section_key: str, plan_section: dict[str, Any], chunks_by_id: dict[str, Any]) -> InteractionBlueprint | None:
+def _enhance_interaction(slide: Any, section_key: str, plan_section: dict[str, Any], chunks_by_id: dict[str, Any], *, slide_index: int = 0) -> InteractionBlueprint | None:
     current = getattr(slide, "interaction", None)
     facts = _source_facts(slide, plan_section, chunks_by_id)
     ids = _source_ids(slide, plan_section)
@@ -367,6 +411,7 @@ def _enhance_interaction(slide: Any, section_key: str, plan_section: dict[str, A
             facts=facts,
             bullets=bullets,
             ids=ids,
+            practice_variant=slide_index,
         )
 
     if current is None:
@@ -734,7 +779,7 @@ def enrich_section_v2(section_draft: Any, *, plan_section: dict[str, Any], chunk
         if len(student) < 45:
             student = _student_action(profile, title)
         script = _teacher_script(str(getattr(slide, "teacher_script", "")), title, question, profile, bullets)
-        interaction = _enhance_interaction(slide, section_key, plan_section, chunks_by_id)
+        interaction = _enhance_interaction(slide, section_key, plan_section, chunks_by_id, slide_index=index)
         interaction_type = str(getattr(interaction, "interaction_type", "") or "")
         design = _design_profile(
             section_key,
