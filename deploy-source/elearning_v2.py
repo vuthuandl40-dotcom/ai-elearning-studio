@@ -688,7 +688,9 @@ def enrich_section_v2(section_draft: Any, *, plan_section: dict[str, Any], chunk
             "scored_interaction": interaction is not None,
             "layout_family": design["layout"],
             "visual_family": design["visual"],
-            "motion_pattern": design["motion"],\n            "layout_reason": f"{section_key}:{design['visual']}",\n            "semantic_role": profile["purpose"],
+            "motion_pattern": design["motion"],
+            "layout_reason": f"{section_key}:{design['visual']}",
+            "semantic_role": profile["purpose"],
         }
         enriched.append(_copy(slide, {
             "onscreen_text": bullets or getattr(slide, "onscreen_text", []),
