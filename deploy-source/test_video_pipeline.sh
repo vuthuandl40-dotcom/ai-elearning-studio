@@ -18,6 +18,16 @@ assert dominant<=0.25, f"one slide layout dominates {dominant:.0%}: {counts}"
 for i in range(max(0,len(layouts)-2)):
     assert not (layouts[i] and layouts[i]==layouts[i+1]==layouts[i+2]), f"three consecutive slides share one layout: {layouts[i:i+3]}"
 print("e2e-slide-diversity-ok",len(counts),"layouts","dominant",round(dominant,3))
+mismatches=[]
+for s in slides:
+    hint=str(s.get("layout_hint") or "")
+    design=s.get("design_json") or {}
+    elements=design.get("elements") or []
+    design_key=str(design.get("layout_key") or "")
+    if elements and hint and design_key and design_key != hint:
+        mismatches.append((s.get("slide_order"),hint,design_key))
+assert not mismatches, f"persisted design overrides semantic layout_hint: {mismatches[:8]}"
+print("e2e-slide-design-alignment-ok",len(slides),"slides")
 PY
 
 curl -fsS -c "$COOKIE" -b "$COOKIE" "$API/projects/$PROJECT_ID/video/storyboard" >/tmp/e2e-video-storyboard.json
