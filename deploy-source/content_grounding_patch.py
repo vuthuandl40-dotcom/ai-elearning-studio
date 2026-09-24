@@ -1473,3 +1473,52 @@ if 'elif run.format == "mp4":' not in s:
 p.write_text(s)
 
 print("fullhd-mp4-export-renderer-ok")
+
+
+# 18) Register V2 semantic layouts in the editor visual catalog.
+# Without this, ensureDesign() silently falls back to the first legacy layout
+# even when lesson_writer.v2 produced a distinct layout_hint.
+p=root/"app/services/visual_catalog.py"
+s=p.read_text()
+if "_V2_SEMANTIC_LAYOUTS" not in s:
+    s += r'''
+
+# V2 semantic eLearning layouts. Keep element names compatible with SlideStage:
+# title, body, visual, question, overlay.
+_V2_SEMANTIC_LAYOUTS = [
+    {"key":"cinematic-hero","name":"Mở bài điện ảnh","description":"Visual toàn cảnh + tiêu đề lớn.","elements":{"visual":[0,0,100,100],"overlay":[0,0,100,100],"title":[8,18,70,25],"body":[8,48,55,24],"question":[8,79,70,11]}},
+    {"key":"milestone-checklist","name":"Mục tiêu theo cột mốc","description":"Mục tiêu lớn, nội dung dạng checklist.","elements":{"title":[8,10,84,14],"body":[10,29,80,50],"question":[10,83,80,9]}},
+    {"key":"question-spotlight","name":"Câu hỏi trung tâm","description":"Câu hỏi gợi mở là trọng tâm thị giác.","elements":{"title":[12,12,76,12],"visual":[8,29,34,46],"question":[47,28,45,33],"body":[47,64,45,21]}},
+    {"key":"scenario-stage","name":"Sân khấu tình huống","description":"Tình huống trực quan + nhiệm vụ học tập.","elements":{"title":[7,9,86,12],"visual":[7,25,55,58],"body":[66,27,27,36],"question":[66,67,27,16]}},
+    {"key":"quiz-card","name":"Thẻ câu hỏi","description":"Câu hỏi và lựa chọn nổi bật.","elements":{"title":[10,9,80,12],"question":[13,25,74,22],"body":[18,51,64,31]}},
+    {"key":"fill-blank-focus","name":"Điền khuyết","description":"Khoảng trống/câu hỏi ở giữa, gợi ý phía dưới.","elements":{"title":[10,9,80,12],"body":[16,26,68,23],"question":[12,55,76,27]}},
+    {"key":"evidence-choice","name":"Chọn bằng chứng","description":"Bằng chứng trực quan + câu hỏi lựa chọn.","elements":{"title":[7,9,86,12],"visual":[7,25,43,52],"body":[54,25,39,30],"question":[54,59,39,18]}},
+    {"key":"real-world-scenario","name":"Vận dụng thực tế","description":"Tình huống thực tế và quyết định.","elements":{"visual":[0,0,48,100],"title":[53,12,40,15],"body":[53,32,40,31],"question":[53,68,40,19]}},
+    {"key":"concept-map","name":"Sơ đồ khái niệm","description":"Trọng tâm khái niệm, nhánh kiến thức xung quanh.","elements":{"title":[20,7,60,12],"visual":[22,24,56,43],"body":[12,70,76,16],"question":[25,88,50,7]}},
+    {"key":"takeaway-cards","name":"Thẻ ghi nhớ","description":"Tóm tắt bằng cụm thẻ kiến thức.","elements":{"title":[8,9,84,13],"body":[8,28,84,52],"question":[18,84,64,9]}},
+    {"key":"source-list","name":"Danh mục nguồn","description":"Nguồn tham chiếu rõ ràng, dễ kiểm tra.","elements":{"title":[8,9,84,12],"body":[10,27,80,59]}},
+    {"key":"activity-board","name":"Bảng luyện tập","description":"Nhiệm vụ luyện tập theo vùng làm việc.","elements":{"title":[7,8,86,12],"body":[7,25,58,56],"visual":[69,25,24,35],"question":[69,64,24,17]}},
+    {"key":"matching-workspace","name":"Không gian nối cặp","description":"Hai vùng ghép/nối trực quan.","elements":{"title":[8,8,84,12],"body":[8,27,39,53],"visual":[53,27,39,53],"question":[20,84,60,8]}},
+    {"key":"sequence-workspace","name":"Sắp xếp trình tự","description":"Nội dung theo chuỗi bước ngang.","elements":{"title":[8,8,84,12],"body":[8,27,84,25],"visual":[8,57,84,24],"question":[20,85,60,8]}},
+    {"key":"comparison-2-column","name":"So sánh hai cột","description":"Hai phía cân bằng để đối chiếu.","elements":{"title":[8,8,84,12],"body":[7,27,41,51],"visual":[52,27,41,51],"question":[17,83,66,9]}},
+    {"key":"evidence-board","name":"Bảng bằng chứng","description":"Nội dung chính + bằng chứng trực quan.","elements":{"title":[7,8,86,12],"visual":[7,25,30,56],"body":[41,25,52,41],"question":[41,70,52,11]}},
+    {"key":"split-visual-explain","name":"Hình và giải thích","description":"Visual lớn bên trái, giải thích bên phải.","elements":{"visual":[0,0,48,100],"title":[53,10,40,14],"body":[53,30,40,43],"question":[53,78,40,12]}},
+    {"key":"chart-focus","name":"Biểu đồ trọng tâm","description":"Biểu đồ lớn với vùng nhận xét.","elements":{"title":[8,7,84,12],"visual":[8,23,60,58],"body":[72,24,20,38],"question":[72,66,20,15]}},
+    {"key":"data-table","name":"Bảng số liệu","description":"Bảng/dữ liệu chiếm vùng chính.","elements":{"title":[8,7,84,12],"visual":[7,23,86,45],"body":[8,72,54,17],"question":[66,72,27,17]}},
+    {"key":"process-timeline","name":"Dòng quy trình","description":"Các bước trải dài theo trục thời gian.","elements":{"title":[8,8,84,12],"visual":[8,28,84,28],"body":[12,61,76,18],"question":[20,83,60,9]}},
+    {"key":"cause-effect","name":"Nguyên nhân – kết quả","description":"Hai vùng liên kết nhân quả.","elements":{"title":[8,8,84,12],"body":[7,28,38,45],"visual":[55,28,38,45],"question":[20,80,60,11]}},
+    {"key":"map-focus","name":"Bản đồ trọng tâm","description":"Bản đồ/lược đồ chiếm phần lớn màn hình.","elements":{"title":[7,7,86,11],"visual":[5,22,67,67],"body":[75,23,20,37],"question":[75,64,20,24]}},
+    {"key":"annotated-visual","name":"Hình chú giải","description":"Visual lớn kèm nội dung chú giải.","elements":{"visual":[4,9,58,82],"title":[66,10,29,16],"body":[66,31,29,39],"question":[66,75,29,15]}},
+    {"key":"zoom-detail","name":"Phóng to chi tiết","description":"Chi tiết trực quan lớn + giải thích ngắn.","elements":{"title":[7,7,86,12],"visual":[19,22,62,50],"body":[10,76,80,12],"question":[25,90,50,6]}},
+    {"key":"full-bleed-annotated","name":"Ảnh toàn màn hình","description":"Visual phủ màn hình với lớp chữ chú thích.","elements":{"visual":[0,0,100,100],"overlay":[0,0,100,100],"title":[6,8,54,14],"body":[6,58,45,25],"question":[55,73,39,14]}},
+    {"key":"visual-left-text-right","name":"Hình trái – chữ phải","description":"Visual trái, nội dung phải.","elements":{"visual":[5,17,44,68],"title":[54,12,40,15],"body":[54,32,40,42],"question":[54,79,40,11]}},
+    {"key":"text-left-visual-right","name":"Chữ trái – hình phải","description":"Nội dung trái, visual phải.","elements":{"title":[6,10,46,14],"body":[6,30,44,46],"visual":[55,17,40,63],"question":[6,81,89,10]}},
+    {"key":"center-focus","name":"Trọng tâm trung tâm","description":"Một trọng tâm thị giác ở giữa.","elements":{"title":[14,8,72,13],"visual":[24,25,52,39],"body":[16,68,68,16],"question":[24,87,52,7]}},
+]
+
+_v2_existing_layout_keys = {item["key"] for item in LAYOUTS}
+LAYOUTS.extend(item for item in _V2_SEMANTIC_LAYOUTS if item["key"] not in _v2_existing_layout_keys)
+'''
+p.write_text(s)
+
+print("v2-semantic-visual-catalog-ok")
