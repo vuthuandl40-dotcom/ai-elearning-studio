@@ -519,6 +519,8 @@ new='''        lesson_draft = validate_and_repair_draft(
             valid_chunk_ids=valid_chunk_ids,
             source_policy=project.source_policy,
         )
+        from app.services.lesson_writer.v2 import rebalance_lesson_layouts
+        lesson_draft = rebalance_lesson_layouts(lesson_draft)
         final_coverage, used_source_count, planned_source_count = _draft_source_coverage(lesson_draft, plan)
         lesson_draft.warnings.append(
             f"Độ phủ nguồn trong bài sinh: {round(final_coverage * 100)}% "
