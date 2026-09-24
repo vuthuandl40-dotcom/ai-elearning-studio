@@ -61,15 +61,18 @@ jobs:
         run: |
           python -m compileall -q app alembic
           python -c 'import app.main; print("backend-import-ok")'
-      - name: Inspect rendered slide canvas
+      - name: Inspect rendered slide stage
         working-directory: src
         run: |
-          echo "SLIDE_FILES_BEGIN"
-          find frontend -type f \( -name '*.tsx' -o -name '*.ts' \) | grep -Ei 'slide|editor|preview' | sort | head -n 180 || true
-          echo "SLIDE_FILES_END"
-          echo "SLIDE_LAYOUT_RENDERERS_BEGIN"
-          grep -RInE 'map-focus|comparison-2-column|annotated-visual|process-timeline|activity-board|question-spotlight|layout_hint|layoutHint' frontend --exclude-dir=node_modules | head -n 520 || true
-          echo "SLIDE_LAYOUT_RENDERERS_END"
+          echo "SLIDE_STAGE_BEGIN"
+          sed -n '1,420p' frontend/components/editor/SlideStage.tsx
+          echo "SLIDE_STAGE_END"
+          echo "DESIGN_BEGIN"
+          sed -n '1,320p' frontend/lib/design.ts
+          echo "DESIGN_END"
+          echo "CATALOG_BEGIN"
+          grep -RInE 'VisualCatalog|layouts|text_visual|map-focus|annotated-visual|comparison-2-column|process-timeline' app frontend --exclude-dir=node_modules | head -n 620 || true
+          echo "CATALOG_END"
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
