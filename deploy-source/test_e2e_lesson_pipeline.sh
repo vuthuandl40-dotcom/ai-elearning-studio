@@ -151,6 +151,27 @@ for slide in slides:
     semantic=(str(slide.get("title") or "")+" "+" ".join(map(str,slide.get("onscreen_text") or []))).lower()
     assert any(cue in semantic for cue in map_cues), f"map-focus used without a real map task: {semantic[:220]}"
 print("e2e-layout-diversity-ok", len(layouts), distinct, counts)
+
+practice_slides=[s for s in slides if str(s.get("slide_type") or "")=="practice"]
+assert len(practice_slides)>=5, f"practice section too shallow: {len(practice_slides)} slides"
+
+interaction_types=[]
+feedback_missing=[]
+for slide in slides:
+    items=slide.get("interactions") or []
+    if isinstance(slide.get("interaction"),dict):
+        items=[slide["interaction"],*items]
+    for item in items:
+        if not isinstance(item,dict):
+            continue
+        kind=str(item.get("interaction_type") or item.get("type") or "")
+        if kind:
+            interaction_types.append(kind)
+        if not str(item.get("correct_feedback") or "").strip() or not str(item.get("incorrect_feedback") or "").strip():
+            feedback_missing.append((slide.get("title"),kind))
+assert len(set(interaction_types))>=4, f"too few interaction types: {interaction_types}"
+assert not feedback_missing, f"interactions missing feedback: {feedback_missing}"
+print("e2e-interaction-diversity-ok", sorted(set(interaction_types)), "practice", len(practice_slides))
 print("e2e-generate-source-grounding-ok", len(slides), hits, nonempty)
 PY
 
