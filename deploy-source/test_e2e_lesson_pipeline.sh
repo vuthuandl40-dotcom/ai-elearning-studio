@@ -131,6 +131,26 @@ hits=sum(word in text for word in ["bay hơi","ngưng tụ","mưa"])
 assert hits>=2, f"generated lesson lost source concepts; hits={hits}"
 nonempty=sum(bool((s.get("onscreen_text") or []) or (s.get("teacher_script") or "").strip()) for s in slides)
 assert nonempty>=12, f"too many empty slides: {nonempty}/{len(slides)}"
+
+from collections import Counter
+layouts=[str(s.get("layout_hint") or "") for s in slides if str(s.get("layout_hint") or "")]
+assert len(layouts)>=12, f"too few slides expose layout hints: {len(layouts)}"
+counts=Counter(layouts)
+distinct=len(counts)
+assert distinct>=7, f"slide layouts are too repetitive: {counts}"
+max_layout,max_count=counts.most_common(1)[0]
+allowed=max(3,(len(layouts)+3)//4)
+assert max_count<=allowed, f"one layout dominates the lesson: {max_layout}={max_count}/{len(layouts)}; {counts}"
+for i in range(2,len(layouts)):
+    assert not (layouts[i]==layouts[i-1]==layouts[i-2]), f"layout repeated 3 times consecutively: {layouts[i]} at {i}"
+
+map_cues=("bản đồ","lược đồ","atlat","atlas","xác định vị trí","phân bố","vị trí địa lí","vị trí địa lý")
+for slide in slides:
+    if slide.get("layout_hint")!="map-focus":
+        continue
+    semantic=(str(slide.get("title") or "")+" "+" ".join(map(str,slide.get("onscreen_text") or []))).lower()
+    assert any(cue in semantic for cue in map_cues), f"map-focus used without a real map task: {semantic[:220]}"
+print("e2e-layout-diversity-ok", len(layouts), distinct, counts)
 print("e2e-generate-source-grounding-ok", len(slides), hits, nonempty)
 PY
 
