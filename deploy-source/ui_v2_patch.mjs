@@ -904,3 +904,27 @@ semanticStage=semanticStage.replace(
   '{visualGlyph}'
 );
 fs.writeFileSync(semanticStagePath,semanticStage);
+
+
+const preservationMapPath=path.join(root,"frontend/app/projects/new/page.tsx");
+let preservationMap=fs.readFileSync(preservationMapPath,"utf8");
+if(!preservationMap.includes("const preservationRows = useMemo")){
+  preservationMap=preservationMap.replace(
+    '  const sourceQualityInfo = useMemo(() => {',
+    '  const preservationRows = useMemo(() => knowledgeTopics.map((topic,index)=>{ const facts=Array.isArray(topic.key_facts)?topic.key_facts as Array<Record<string,unknown>>:[]; const topicIds=new Set<string>(); const ownIds=Array.isArray(topic.source_chunk_ids)?topic.source_chunk_ids:[]; ownIds.forEach(id=>topicIds.add(String(id))); facts.forEach(f=>{const ids=Array.isArray(f.source_chunk_ids)?f.source_chunk_ids:[];ids.forEach(id=>topicIds.add(String(id)));}); const matched=sections.filter(section=>{const ids=Array.isArray(section.source_chunk_ids)?section.source_chunk_ids:[];return ids.some(id=>topicIds.has(String(id)));}); const covered=new Set<string>(); matched.forEach(section=>{const ids=Array.isArray(section.source_chunk_ids)?section.source_chunk_ids:[];ids.forEach(id=>{if(topicIds.has(String(id)))covered.add(String(id));});}); const keys=matched.map(section=>String(section.section_key||"")); const ways=Array.from(new Set(keys.map(key=>key.startsWith("explore_")?"Màn hình khám phá":key.startsWith("interaction_")?"Tương tác":key==="practice"?"Luyện tập":key==="application"?"Vận dụng":key==="summary"?"Tổng kết":"Màn hình bài học"))); const kept=topicIds.size?covered.size===topicIds.size:matched.length>0; return {index:index+1,title:String(topic.title||"Nội dung"),section:matched.map(section=>String(section.title||section.section_key||"")).join(" · ")||"Chưa ánh xạ",way:ways.join(" + ")||"Chưa xử lý",kept,covered:covered.size,total:topicIds.size}; }), [knowledgeTopics,sections]);\n  const preservationReady = preservationRows.length>0 && preservationRows.every(row=>row.kept);\n  const sourceQualityInfo = useMemo(() => {'
+  );
+  preservationMap=preservationMap.replace(
+    '  const sourceReady = knowledgeTopics.length>0 && (sourceQualityInfo.coverage??0)>=95;',
+    '  const sourceReady = knowledgeTopics.length>0 && (sourceQualityInfo.coverage??0)>=95 && preservationReady;'
+  );
+  const previewMarker='<details className="mt-5 overflow-hidden rounded-2xl border border-indigo-100 bg-indigo-50/40" open><summary className="cursor-pointer list-none px-4 py-3 text-sm font-black text-indigo-800">▣ Nội dung AI đã đọc từ giáo án';
+  if(preservationMap.includes(previewMarker)){
+    const table='<details className="mt-5 overflow-hidden rounded-2xl border border-emerald-100 bg-emerald-50/40" open><summary className="cursor-pointer list-none px-4 py-3 text-sm font-black text-emerald-800">✓ Bảng bảo toàn nội dung <span className="ml-2 text-[10px] font-bold text-emerald-600">({preservationRows.filter(r=>r.kept).length}/{preservationRows.length} đã xử lý)</span></summary><div className="overflow-x-auto border-t border-emerald-100 bg-white"><table className="w-full min-w-[760px] text-left text-[11px]"><thead className="bg-slate-50 text-slate-500"><tr><th className="px-3 py-2">STT</th><th className="px-3 py-2">Nội dung gốc</th><th className="px-3 py-2">Vị trí trong bài</th><th className="px-3 py-2">Cách thể hiện eLearning</th><th className="px-3 py-2">Trạng thái</th></tr></thead><tbody>{preservationRows.map(row=><tr key={row.index} className="border-t border-slate-100"><td className="px-3 py-2 font-black">{row.index}</td><td className="px-3 py-2 font-semibold text-slate-700">{row.title}<div className="mt-1 text-[9px] font-normal text-slate-400">{row.total?row.covered+"/"+row.total+" source chunks":"Theo nhóm nội dung"}</div></td><td className="px-3 py-2 text-slate-500">{row.section}</td><td className="px-3 py-2 text-indigo-700">{row.way}</td><td className="px-3 py-2"><span className={"rounded-full px-2 py-1 text-[9px] font-black "+(row.kept?"bg-emerald-50 text-emerald-700":"bg-rose-50 text-rose-700")}>{row.kept?"Đã giữ":"Cần xử lý"}</span></td></tr>)}</tbody></table>{!preservationReady?<div className="border-t border-rose-100 bg-rose-50 p-3 text-xs font-bold text-rose-700">Chưa được phép sinh bài: còn nội dung gốc chưa được ánh xạ đầy đủ vào cấu trúc eLearning.</div>:null}</div></details>';
+    preservationMap=preservationMap.replace(previewMarker,table+previewMarker);
+  }
+  preservationMap=preservationMap.replace(
+    'Chưa đủ điều kiện sinh bài: cần đọc được nội dung nguồn và độ phủ nguồn ≥ 95%.',
+    'Chưa đủ điều kiện sinh bài: cần đọc được nội dung nguồn, độ phủ nguồn ≥ 95% và toàn bộ Bảng bảo toàn nội dung phải ở trạng thái “Đã giữ”.'
+  );
+}
+fs.writeFileSync(preservationMapPath,preservationMap);
