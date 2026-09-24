@@ -64,11 +64,11 @@ jobs:
       - name: Inspect rendered slide canvas
         working-directory: src
         run: |
-          echo "SLIDE_CANVAS_BEGIN"
-          sed -n '1,360p' frontend/components/editor/SlideCanvas.tsx
-          echo "SLIDE_CANVAS_END"
+          echo "SLIDE_FILES_BEGIN"
+          find frontend -type f \( -name '*.tsx' -o -name '*.ts' \) | grep -Ei 'slide|editor|preview' | sort | head -n 180 || true
+          echo "SLIDE_FILES_END"
           echo "SLIDE_LAYOUT_RENDERERS_BEGIN"
-          grep -RInE 'map-focus|comparison-2-column|annotated-visual|process-timeline|activity-board|question-spotlight|layout_hint' frontend/components frontend/app --exclude-dir=node_modules | head -n 420 || true
+          grep -RInE 'map-focus|comparison-2-column|annotated-visual|process-timeline|activity-board|question-spotlight|layout_hint|layoutHint' frontend --exclude-dir=node_modules | head -n 520 || true
           echo "SLIDE_LAYOUT_RENDERERS_END"
       - uses: actions/setup-node@v4
         with:
