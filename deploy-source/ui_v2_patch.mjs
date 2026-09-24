@@ -878,7 +878,7 @@ if(!semanticSlideStage.includes("const renderSemanticBody =")){
 
   const oldFallback='<div><div className="text-3xl">{slide.visual_type === "map" ? "🗺️" : slide.visual_type === "quiz_ui" ? "🧩" : slide.visual_type === "video_scene" ? "🎬" : "🖼️"}</div><div className="mt-2 text-[10px] font-black uppercase tracking-wider" style={{ color: theme.tokens.accent }}>{slide.visual_type || "visual"}</div><div className="mt-1 line-clamp-5 text-[10px] leading-4" style={{ color: theme.tokens.muted }}>{slide.visual_description || "Kéo media từ thư viện hoặc sinh từ prompt."}</div></div>';
   if(!semanticSlideStage.includes(oldFallback)) throw new Error("SlideStage visual fallback marker missing");
-  semanticSlideStage=semanticSlideStage.replace(oldFallback,'{renderSemanticVisualFallback()}');
+  semanticSlideStage=semanticSlideStage.replace(oldFallback,'renderSemanticVisualFallback()');
 
   fs.writeFileSync(semanticSlideStagePath,semanticSlideStage);
 }
