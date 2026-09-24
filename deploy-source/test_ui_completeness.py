@@ -57,3 +57,20 @@ for token in ["downloadExport: async","credentials:\"include\"","URL.createObjec
     assert token in api, f"authenticated export download missing: {token}"
 
 print("ui-completeness-regression-ok", len(required_routes), len(labels))
+
+
+stage=(root/"components/editor/SlideStage.tsx").read_text()
+for token in [
+    "const layoutKey = design.layout_key",
+    "const cardLayouts = new Set",
+    "process-timeline",
+    "comparison-2-column",
+    "quiz-card",
+    "concept-map",
+    "map-focus",
+    "chart-focus",
+    "data-table",
+    "visualGlyph",
+]:
+    assert token in stage, f"semantic slide renderer missing: {token}"
+print("semantic-slide-renderer-regression-ok")
