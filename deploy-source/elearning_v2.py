@@ -649,6 +649,7 @@ def enrich_section_v2(section_draft: Any, *, plan_section: dict[str, Any], chunk
     section_key = str(plan_section.get("section_key") or getattr(section_draft, "section_key", ""))
     profile = _profile(section_key)
     enriched: list[Any] = []
+    used_layouts: list[str] = []
     for index, slide in enumerate(getattr(section_draft, "slides", []) or []):
         title = _clean(str(getattr(slide, "title", ""))) or f"Màn hình {index + 1}"
         bullets = _rich_bullets(slide, plan_section, chunks_by_id, slide_index=index)
