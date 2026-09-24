@@ -42,6 +42,15 @@ jobs:
           tar -xJf source.tar.xz -C src
           patch -d src -p1 < deploy-source/patches/0001-lesson-editor-null-project.patch
           python deploy-source/content_grounding_patch.py src
+      - name: Inspect interaction persistence API
+        working-directory: src
+        run: |
+          echo "INTERACTION_ROUTES_BEGIN"
+          sed -n '1,300p' app/api/routes/interactions.py
+          echo "INTERACTION_ROUTES_END"
+          echo "SLIDE_SCHEMA_BEGIN"
+          grep -RIn -A80 -B20 'class Slide' app/schemas app/api | head -n 300 || true
+          echo "SLIDE_SCHEMA_END"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
