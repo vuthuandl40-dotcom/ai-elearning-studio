@@ -1569,3 +1569,35 @@ if "LAYOUT DIVERSITY RULES" not in s:
 p.write_text(s)
 
 print("writer-semantic-layout-hints-ok")
+
+
+# 20) Align planner depth with MASTER PROMPT learning cycles and practice volume.
+p=root/"app/services/pedagogy_planner/local_planner.py"
+s=p.read_text()
+s=s.replace(
+    'slide_count_hint=max(1, min(8, len(group))) if group else 1,',
+    'slide_count_hint=max(3, min(8, max(len(group), 3))) if group else 1,'
+)
+s=s.replace(
+    '"practice", slide_count_hint=2,',
+    '"practice", slide_count_hint=5,'
+)
+s=s.replace(
+    'student_activity="Hoàn thành chuỗi câu hỏi từ nhận biết đến vận dụng phù hợp.",',
+    'student_activity="Hoàn thành tối thiểu 5 câu luyện tập phối hợp nhiều dạng từ nhận biết, thông hiểu đến vận dụng; đọc phản hồi và thử lại khi cần.",'
+)
+p.write_text(s)
+
+p=root/"app/services/pedagogy_planner/openai_client.py"
+s=p.read_text()
+if "MASTER PROMPT DEPTH RULES" not in s:
+    marker="12. slide_count_hint must be large enough to cover the assigned source topics without overloading slides; for Explore sections, normally plan about one screen per distinct source topic/activity, up to 8 screens."
+    addition="""12. slide_count_hint must be large enough to cover the assigned source topics without overloading slides; for Explore sections, use at least 3 screens when source content exists and normally about one screen per distinct source topic/activity, up to 8 screens.
+13. MASTER PROMPT DEPTH RULES: a knowledge unit must not collapse into one explanatory slide. Prefer a sequence of problem/question → observation/source → learner thinking/action → explanation/conclusion → quick check, using multiple screens when the source supports it.
+14. The practice section must plan 5–10 scored questions/screens, combining multiple interaction forms where supported by source content. Each question must include feedback and retry/hint behavior in the Writer stage.
+15. Geography-specific planning: map/atlas, charts, data tables and geographic images must be assigned to dedicated learning actions instead of generic bullet slides."""
+    if marker in s:
+        s=s.replace(marker,addition)
+p.write_text(s)
+
+print("master-prompt-planner-depth-ok")
