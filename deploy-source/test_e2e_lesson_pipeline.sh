@@ -120,6 +120,16 @@ print("e2e-final-source-coverage", line)
 PY
 
 curl -fsS -c "$COOKIE" -b "$COOKIE" "$API/projects/$PROJECT_ID/slides" >/tmp/e2e-slides.json
+python - <<'PY' >/tmp/e2e-slide-ids.txt
+import json
+for slide in json.load(open("/tmp/e2e-slides.json")):
+    print(slide["id"])
+PY
+: >/tmp/e2e-interactions.ndjson
+while IFS= read -r SLIDE_ID; do
+  curl -fsS -c "$COOKIE" -b "$COOKIE" "$API/slides/$SLIDE_ID/interactions" >>/tmp/e2e-interactions.ndjson
+  printf '\n' >>/tmp/e2e-interactions.ndjson
+done </tmp/e2e-slide-ids.txt
 python - <<'PY'
 import json
 slides=json.load(open("/tmp/e2e-slides.json"))
@@ -155,23 +165,31 @@ print("e2e-layout-diversity-ok", len(layouts), distinct, counts)
 practice_slides=[s for s in slides if str(s.get("slide_type") or "")=="practice"]
 assert len(practice_slides)>=5, f"practice section too shallow: {len(practice_slides)} slides"
 
-interaction_types=[]
-feedback_missing=[]
-for slide in slides:
-    items=slide.get("interactions") or []
-    if isinstance(slide.get("interaction"),dict):
-        items=[slide["interaction"],*items]
-    for item in items:
-        if not isinstance(item,dict):
+interaction_rows=[]
+with open("/tmp/e2e-interactions.ndjson",encoding="utf-8") as fh:
+    for line in fh:
+        line=line.strip()
+        if not line:
             continue
-        kind=str(item.get("interaction_type") or item.get("type") or "")
-        if kind:
-            interaction_types.append(kind)
-        if not str(item.get("correct_feedback") or "").strip() or not str(item.get("incorrect_feedback") or "").strip():
-            feedback_missing.append((slide.get("title"),kind))
-assert len(set(interaction_types))>=4, f"too few interaction types: {interaction_types}"
+        rows=json.loads(line)
+        assert isinstance(rows,list)
+        interaction_rows.extend(rows)
+
+interaction_types=[str(item.get("interaction_type") or "") for item in interaction_rows if str(item.get("interaction_type") or "")]
+feedback_missing=[
+    (item.get("id"),item.get("interaction_type"))
+    for item in interaction_rows
+    if not str(item.get("correct_feedback") or "").strip() or not str(item.get("incorrect_feedback") or "").strip()
+]
+practice_ids={str(s["id"]) for s in practice_slides}
+practice_interactions=[item for item in interaction_rows if str(item.get("slide_id")) in practice_ids]
+practice_types=[str(item.get("interaction_type") or "") for item in practice_interactions if str(item.get("interaction_type") or "")]
+
+assert len(practice_interactions)>=5, f"practice interactions too few: {len(practice_interactions)}"
+assert len(set(practice_types))>=4, f"practice interaction types too few: {practice_types}"
+assert len(set(interaction_types))>=4, f"lesson interaction types too few: {interaction_types}"
 assert not feedback_missing, f"interactions missing feedback: {feedback_missing}"
-print("e2e-interaction-diversity-ok", sorted(set(interaction_types)), "practice", len(practice_slides))
+print("e2e-interaction-diversity-ok", sorted(set(practice_types)), "practice", len(practice_slides), "interactions", len(practice_interactions))
 print("e2e-generate-source-grounding-ok", len(slides), hits, nonempty)
 PY
 
