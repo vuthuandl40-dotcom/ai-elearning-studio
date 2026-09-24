@@ -724,7 +724,9 @@ def enrich_section_v2(section_draft: Any, *, plan_section: dict[str, Any], chunk
     profile = _profile(section_key)
     enriched: list[Any] = []
     used_layouts: list[str] = []
-    for index, slide in enumerate(getattr(section_draft, "slides", []) or []):
+    section_slides = list(getattr(section_draft, "slides", []) or [])
+    for index, slide in enumerate(section_slides):
+        cycle_stage = _knowledge_cycle_stage(section_key, index, len(section_slides))
         title = _clean(str(getattr(slide, "title", ""))) or f"Màn hình {index + 1}"
         bullets = _rich_bullets(slide, plan_section, chunks_by_id, slide_index=index)
         question = _clean(str(getattr(slide, "guiding_question", ""))) or _guiding(title, profile, bullets)
@@ -742,6 +744,7 @@ def enrich_section_v2(section_draft: Any, *, plan_section: dict[str, Any], chunk
             bullets,
             interaction_type=interaction_type,
             previous_layouts=used_layouts,
+            cycle_stage=cycle_stage,
         )
         used_layouts.append(design["layout"])
         metadata = dict(getattr(slide, "metadata", {}) or {})
@@ -757,7 +760,8 @@ def enrich_section_v2(section_draft: Any, *, plan_section: dict[str, Any], chunk
             "completion_criteria": "Người học tạo được sản phẩm/đầu ra học tập theo yêu cầu và dùng ít nhất một chi tiết từ học liệu để giải thích.",
             "accessibility_alt": f"Minh họa học tập cho nội dung: {title}.",
             "transition": "Nhận phản hồi → chốt ý → kết nối với nhiệm vụ kế tiếp.",
-            "screen_sequence": "Gợi mở → học liệu → hành động của học sinh → phản hồi → chốt kiến thức.",
+            "screen_sequence": "Gợi vấn đề → Quan sát → Tương tác → Suy nghĩ → Giải thích → Kết luận → Kiểm tra.",
+            "knowledge_cycle_stage": cycle_stage,
             "source_safe": True,
             "content_depth": "rich" if len(bullets) >= 3 else "needs-review",
             "scored_interaction": interaction is not None,
