@@ -1522,3 +1522,48 @@ LAYOUTS.extend(item for item in _V2_SEMANTIC_LAYOUTS if item["key"] not in _v2_e
 p.write_text(s)
 
 print("v2-semantic-visual-catalog-ok")
+
+
+# 19) Normalize local/OpenAI writer layout hints to exact semantic catalog keys.
+p=root/"app/services/lesson_writer/local_writer.py"
+s=p.read_text()
+s=s.replace(
+    'layout_hint="hero-title: tiêu đề lớn, ít chữ, visual chiếm 60–70% khung hình"',
+    'layout_hint="cinematic-hero"'
+)
+s=s.replace(
+    'layout_hint="checklist 2 cột, tối đa 6 ý"',
+    'layout_hint="milestone-checklist"'
+)
+s=s.replace(
+    'layout_hint="reference-list"',
+    'layout_hint="source-list"'
+)
+s=s.replace(
+    'layout_hint="visual-left/text-right" if slide_type in {"content", "explore"} else "single-focus"',
+    'layout_hint="annotated-visual" if slide_type in {"content", "explore"} else "quiz-card"'
+)
+p.write_text(s)
+
+p=root/"app/services/lesson_writer/openai_client.py"
+s=p.read_text()
+if "LAYOUT DIVERSITY RULES" not in s:
+    marker="16. Do not output citations as prose. Put traceability only in source_refs / interaction.source_chunk_ids."
+    addition="""16. Do not output citations as prose. Put traceability only in source_refs / interaction.source_chunk_ids.
+17. LAYOUT DIVERSITY RULES: layout_hint must be an exact key from this list:
+    cinematic-hero, milestone-checklist, question-spotlight, scenario-stage,
+    quiz-card, fill-blank-focus, evidence-choice, real-world-scenario,
+    concept-map, takeaway-cards, source-list, activity-board,
+    matching-workspace, sequence-workspace, comparison-2-column,
+    evidence-board, split-visual-explain, chart-focus, data-table,
+    process-timeline, cause-effect, map-focus, annotated-visual,
+    zoom-detail, full-bleed-annotated, visual-left-text-right,
+    text-left-visual-right, center-focus.
+18. Do not use the same layout on more than two consecutive slides. Prefer a visibly different composition when the learning action changes.
+19. Use map-focus ONLY when the screen actually asks learners to read/locate/identify/discuss a map, atlas or spatial distribution. Words such as longitude, latitude or coordinates by themselves do not justify a map layout.
+20. Use data-table for data tables; chart-focus for charts; cause-effect for causes/results; comparison-2-column for comparison; process-timeline for processes/sequences; annotated-visual or zoom-detail for image/feature observation."""
+    if marker in s:
+        s=s.replace(marker,addition)
+p.write_text(s)
+
+print("writer-semantic-layout-hints-ok")
